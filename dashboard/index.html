@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyGuard AI — AWS Quality Assurance</title>
+<style>
+  :root { --bg: #0e1420; --panel: #182233; --ink: #dfe8f5; --dim: #8fa1bd;
+          --ok: #3ecf8e; --warn: #f5b83d; --bad: #ff5d5d; --line: #2a3a55; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.45 system-ui, sans-serif; }
+  header { display: flex; gap: 12px; align-items: center; padding: 12px 16px;
+           border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 17px; margin: 0; }
+  header input { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+                 border-radius: 6px; padding: 6px 8px; width: 260px; }
+  main { display: grid; grid-template-columns: 240px 1fr 320px; gap: 12px; padding: 12px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 0 0 8px; }
+  #stations button { display: block; width: 100%; text-align: left; margin: 2px 0;
+    background: none; border: 1px solid transparent; color: var(--ink);
+    border-radius: 6px; padding: 6px 8px; cursor: pointer; }
+  #stations button.sel { border-color: var(--warn); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .ok { background: var(--ok); } .warn { background: var(--warn); } .bad { background: var(--bad); }
+  svg.chart { width: 100%; height: 150px; background: #101827; border-radius: 6px; }
+  #verdict { font-size: 15px; font-weight: 600; }
+  #evidence li { margin-bottom: 4px; }
+  .mono { font-family: ui-monospace, monospace; font-size: 12px; }
+  #anoms div { border-bottom: 1px solid var(--line); padding: 4px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>SkyGuard AI</h1>
+  <input id="token" type="password" placeholder="API bearer token">
+  <button id="go">Connect</button>
+  <span id="net" class="mono"></span>
+</header>
+<main>
+  <section><h2>Stations</h2><div id="stations"></div></section>
+  <section>
+    <h2 id="stitle">Station</h2>
+    <div id="charts"></div>
+  </section>
+  <section>
+    <h2>Latest verdict</h2>
+    <div id="verdict">—</div>
+    <ul id="evidence"></ul>
+    <h2>Anomaly worklist</h2>
+    <div id="anoms"></div>
+  </section>
+</main>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let base = location.origin, stationId = null;
+
+function auth() {
+  const t = $("token").value.trim();
+  if (t) sessionStorage.setItem("sg_token", t);
+  return { "Authorization": "Bearer " + (t || sessionStorage.getItem("sg_token") || "") };
+}
+async function get(path) {
+  const r = await fetch(base + path, { headers: auth() });
+  if (!r.ok) throw new Error(path + " -> " + r.status);
+  return r.json();
+}
+// Hand-rolled SVG line chart with anomaly markers. No libraries, no build.
+function chart(el, label, unit, points) {
+  const W = 640, H = 150, P = 8;
+  const vals = points.map(p => p.v).filter(v => v !== null);
+  if (!vals.length) { el.innerHTML = ""; return; }
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (hi === lo) { hi = lo + 1; }
+  const X = i => P + i * (W - 2 * P) / Math.max(points.length - 1, 1);
+  const Y = v => H - P - (v - lo) * (H - 2 * P) / (hi - lo);
+  let d = "";
+  points.forEach((p, i) => { if (p.v !== null) d += (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p.v).toFixed(1) + " "; });
+  let dots = points.filter(p => p.v !== null && p.bad)
+    .map(p => `<circle cx="${X(p.i)}" cy="${Y(p.v)}" r="3.5" fill="#ff5d5d"/>`).join("");
+  el.innerHTML = `<h2>${label} (${unit}) — last ${points[points.length-1].v}</h2>` +
+    `<svg class="chart" viewBox="0 0 ${W} ${H}"><path d="${d}" stroke="#7db4ff" fill="none" stroke-width="1.5"/>${dots}</svg>`;
+}
+async function loadStations() {
+  const data = await get("/stations");
+  const box = $("stations"); box.innerHTML = "";
+  $("net").textContent = data.stations.length + " stations";
+  data.stations.forEach(s => {
+    const b = document.createElement("button");
+    b.textContent = s.station_id + " — " + s.name;
+    b.onclick = () => { stationId = s.station_id; loadStation(); };
+    box.appendChild(b);
+  });
+  if (data.stations.length && !stationId) { stationId = data.stations[0].station_id; loadStation(); }
+}
+async function loadStation() {
+  document.querySelectorAll("#stations button").forEach(b =>
+    b.classList.toggle("sel", b.textContent.startsWith(stationId + " ")));
+  $("stitle").textContent = stationId;
+  const data = await get(`/stations/${stationId}/records?limit=120`);
+  const recs = data.records;
+  const mk = key => recs.map((r, i) => ({ i, v: r.observation[key],
+    bad: r.fusion.is_anomaly }));
+  const box = $("charts"); box.innerHTML = "";
+  [["Temperature", "°C", "temp_c"], ["Pressure", "hPa", "pressure_hpa"],
+   ["Humidity", "%", "rh_pct"]].forEach(([label, unit, key]) => {
+    const div = document.createElement("div"); box.appendChild(div);
+    chart(div, label, unit, mk(key));
+  });
+  const last = recs[recs.length - 1];
+  if (last) {
+    $("verdict").textContent = `${last.fusion.band} p=${last.fusion.probability.toFixed(2)} — ${last.diagnosis.fault_class}`;
+    $("evidence").innerHTML = last.diagnosis.evidence
+      .map(e => `<li><b>${e.label}</b> (${(e.contribution * 100).toFixed(0)}%)<br><span class="mono">${e.detail}</span></li>`).join("")
+      || "<li>No contributing evidence.</li>";
+  }
+  const anoms = await get(`/anomalies?station=${stationId}&limit=20`);
+  $("anoms").innerHTML = anoms.anomalies
+    .map(a => `<div class="mono">${a.observation.timestamp}<br>${a.diagnosis.fault_class} p=${a.fusion.probability.toFixed(2)}</div>`).join("")
+    || "<div>None.</div>";
+}
+$("go").onclick = () => loadStations().catch(e => { $("net").textContent = String(e); });
+$("token").value = sessionStorage.getItem("sg_token") || "";
+loadStations().catch(() => { $("net").textContent = "enter token, press Connect"; });
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# Python bytecode — regenerated on every test run, never committed.
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+
+# Editors and OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local secrets (API tokens live in env vars, see skyguard/config.py ApiConfig)
+.env
+
