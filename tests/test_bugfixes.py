@@ -185,17 +185,19 @@ def test_partial_missing_pressure_only():
 # Bug 5 — Genuine-weather event labels use exclusive end as inclusive
 # ---------------------------------------------------------------------------
 
-from skyguard.data.simulator import SimulatorConfig, simulate_network
 from skyguard.data.injector import InjectorConfig, inject_faults
 from skyguard.types import FaultClass
+from support import archive_available, real_network
 
 
 def test_genuine_event_end_is_exclusive():
-    """Bug 5: simulator events have half-open [start, end); the injector must
-    convert to inclusive end_index = end - 1, not use end directly."""
-    net = simulate_network(SimulatorConfig(n_stations=2, days=30, seed=42))
+    """Bug 5: genuine-weather events carry half-open [start, end); the injector
+    must convert to inclusive end_index = end - 1, not use end directly."""
+    if not archive_available():
+        pytest.skip("run examples/fetch_real_data.py to download the archive CSV")
+    net = real_network(days=90)
     if not net.genuine_events:
-        pytest.skip("no genuine events in this seed")
+        pytest.skip("no genuine extreme weather in this slice")
     result = inject_faults(net, InjectorConfig(seed=42))
     for f in result.faults:
         if f.fault_class == FaultClass.GENUINE_EXTREME:
@@ -213,7 +215,9 @@ def test_genuine_event_end_is_exclusive():
 
 def test_genuine_event_regime_exclusion_no_extra_point():
     """Bug 5: regime_occupied mask must not extend one past the event end."""
-    net = simulate_network(SimulatorConfig(n_stations=2, days=60, seed=7))
+    if not archive_available():
+        pytest.skip("run examples/fetch_real_data.py to download the archive CSV")
+    net = real_network(days=90)
     result = inject_faults(net, InjectorConfig(seed=107))
     # Collect all genuine-extreme inclusive ranges.
     genuine_ranges = []
@@ -345,3 +349,116 @@ def test_store_fetch_with_offset_bounds():
         window = store.fetch_station("S1", start=start_ist)
         assert len(window) == 4, f"expected 4 records, got {len(window)}"
         store.close()
+
+
+# ---------------------------------------------------------------------------
+# Bug 8 - the zero-dependency runner skipped parametrize cases when real
+# pytest happened to be installed
+# ---------------------------------------------------------------------------
+
+import importlib.util
+from pathlib import Path
+
+
+def _runner_module():
+    """Import tests/run_tests.py by path; it is a script, not a package member."""
+    path = Path(__file__).resolve().parent / "run_tests.py"
+    spec = importlib.util.spec_from_file_location("skyguard_test_runner", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_runner_expands_parametrize_from_whichever_pytest_is_present():
+    """Bug 8: `_install_shim` steps aside when real pytest is importable, so the
+    cases land on pytest's own `pytestmark` and never on `_param_cases`. The
+    runner then called the test with no arguments and reported a TypeError, and
+    the four sentinel cases plus two impossible-value cases silently vanished
+    from the count."""
+    runner = _runner_module()
+
+    @pytest.mark.parametrize("sentinel", [999.0, -999.0, 9999.0, -9999.0])
+    def sample(sentinel):
+        return sentinel
+
+    cases = runner.parameter_cases(sample)
+    assert len(cases) == 4, f"expected 4 expanded cases, got {len(cases)}"
+    assert [c[0]["sentinel"] for c in cases] == [999.0, -999.0, 9999.0, -9999.0]
+    for kwargs, label in cases:
+        assert sample(**kwargs) == kwargs["sentinel"]
+        assert label
+
+
+def test_runner_expands_multi_argument_parametrize():
+    runner = _runner_module()
+
+    @pytest.mark.parametrize("field,value", [("temp_c", 150.0), ("rh_pct", 250.0)])
+    def sample(field, value):
+        return field, value
+
+    cases = runner.parameter_cases(sample)
+    assert len(cases) == 2
+    assert cases[0][0] == {"field": "temp_c", "value": 150.0}
+
+
+def test_runner_takes_the_cross_product_of_stacked_parametrize():
+    runner = _runner_module()
+
+    @pytest.mark.parametrize("a", [1, 2])
+    @pytest.mark.parametrize("b", ["x", "y", "z"])
+    def sample(a, b):
+        return a, b
+
+    cases = runner.parameter_cases(sample)
+    assert len(cases) == 6
+    assert {(c[0]["a"], c[0]["b"]) for c in cases} == {
+        (1, "x"), (1, "y"), (1, "z"), (2, "x"), (2, "y"), (2, "z")}
+
+
+def test_runner_leaves_unparametrised_tests_with_one_empty_case():
+    runner = _runner_module()
+
+    def sample():
+        return True
+
+    assert runner.parameter_cases(sample) == [({}, "")]
+
+
+# ---------------------------------------------------------------------------
+# Bug 9 - no path existed to train the Layer 6 forest on pipeline fingerprints
+# ---------------------------------------------------------------------------
+
+def test_pipeline_hands_out_the_fingerprints_it_builds():
+    """Bug 9: the forest consumes the 14-column fingerprint the pipeline builds
+    at inference, but nothing exposed it, so training data had to be a second
+    implementation of the same feature contract. `fingerprint_sink` closes that
+    gap; the width assertion is what stops the two drifting apart."""
+    from skyguard.diagnostics.forest import N_FEATURES
+    from skyguard.pipeline import SkyGuardPipeline
+    from skyguard.types import Observation
+
+    seen = []
+    pipe = SkyGuardPipeline(fingerprint_sink=lambda obs, fp: seen.append((obs.station_id, fp)))
+    start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    for i in range(6):
+        pipe.process(Observation("S1", start + timedelta(hours=i), 25.0 + i * 0.1, 1000.0, 60.0))
+
+    assert len(seen) == 6
+    assert all(station == "S1" for station, _ in seen)
+    assert all(len(fp) == N_FEATURES for _, fp in seen)
+    assert all(all(math.isfinite(v) for v in fp) for _, fp in seen)
+
+
+def test_fingerprint_sink_stays_quiet_on_incomplete_observations():
+    """An incomplete reading has no fingerprint to build, and emitting a padded
+    one would teach the forest that zeros mean something."""
+    from skyguard.pipeline import SkyGuardPipeline
+    from skyguard.types import Observation
+
+    seen = []
+    pipe = SkyGuardPipeline(fingerprint_sink=lambda obs, fp: seen.append(fp))
+    start = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    pipe.process(Observation("S1", start, 25.0, 1000.0, 60.0))
+    pipe.process(Observation("S1", start + timedelta(hours=1), None, 1000.0, 60.0))
+    pipe.process(Observation("S1", start + timedelta(hours=2), 25.2, 1000.0, 60.0))
+    assert len(seen) == 2

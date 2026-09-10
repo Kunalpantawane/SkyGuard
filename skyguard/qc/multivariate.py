@@ -1,4 +1,4 @@
-"""Layer 3 — multivariate joint-state consistency of T, P and RH.
+"""Layer 3: multivariate joint-state consistency of T, P and RH.
 
 Why this layer exists: the three variables are one atmospheric state, not three
 independent streams. 55 C with 99 % RH can pass every individual range check
@@ -13,7 +13,7 @@ Two mechanisms, applied where each is appropriate:
    on a plausible state is still suspicious arriving in one step.
 2. **Dew-point guard**: dew point above air temperature is a hard physical
    impossibility (at RH <= 100 % it cannot happen), not a statistical opinion.
-   It fires rarely — Layer 1 range checks already exclude most such states —
+   It fires rarely: Layer 1 range checks already exclude most such states -
    but when it fires it is close to certain.
 """
 
@@ -29,12 +29,12 @@ from ..config import DEFAULT_CONFIG, VARIABLES, MultivariateConfig
 from ..types import MultivariateResult
 
 # Magnus-form coefficients (valid roughly -45..60 C). Shared with the
-# simulator's dew-point coupling so "consistent" means the same thing in both.
+# same Magnus pair the injector uses, so "consistent" means one thing everywhere.
 _MAGNUS_B = 17.625
 _MAGNUS_C = 243.04
 
 # Probability model lives in Mahalanobis units, which are sigma units by
-# construction — so a unit scale is principled here, not a magic number.
+# construction: so a unit scale is principled here, not a magic number.
 _PROBABILITY_SCALE = 1.0
 
 # A hard physical violation sits above fusion's HIGH band but below a Layer 1
@@ -73,7 +73,7 @@ class MultivariateQC:
     Fitted per station (never global): elevation and microclimate shift the
     joint distribution, and a global fit would blur exactly the structure this
     layer is meant to test. Streaming state is one previous observation per
-    station — O(1), as the streaming convention requires.
+    station: O(1), as the streaming convention requires.
     """
 
     def __init__(self, config: MultivariateConfig | None = None) -> None:
@@ -88,7 +88,7 @@ class MultivariateQC:
 
         Deltas are derived internally from consecutive rows, so the caller
         passes raw levels. Returns the feature rows used. Raises ValueError on
-        non-finite input — fitting on NaNs would silently bless everything.
+        non-finite input: fitting on NaNs would silently bless everything.
         """
         levels = np.asarray(history, dtype=np.float64)
         if levels.ndim != 2 or levels.shape[1] != 3:
@@ -133,7 +133,7 @@ class MultivariateQC:
         """Score one observation's joint state.
 
         Unavailable (not a pass) when the triplet is incomplete, the station
-        is unfitted, or no previous observation exists for deltas — a joint
+        is unfitted, or no previous observation exists for deltas: a joint
         verdict from a partial state would be a guess dressed as analysis.
 
         `hard_invalid` means Layer 1 already proved a value impossible (sentinel
@@ -178,7 +178,7 @@ class MultivariateQC:
         detail = (
             f"Mahalanobis d={distance:.2f} vs {self.config.mahalanobis_threshold:.2f}; "
             f"dewpoint {dew:.1f}C vs air {temp_c:.1f}C"
-            + (" — PHYSICAL VIOLATION" if physical_violation else "")
+            + (": PHYSICAL VIOLATION" if physical_violation else "")
         )
         return MultivariateResult(
             available=True,

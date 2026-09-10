@@ -1,7 +1,7 @@
-"""Layer 6c — operator-facing narrative: verdict, severity, action.
+"""Layer 6c: operator-facing narrative: verdict, severity, action.
 
 Why a separate module: the forest says "spike, 94 %", Shapley says which
-fingerprint features voted — but neither tells an operator what to *do*.
+fingerprint features voted: but neither tells an operator what to *do*.
 This module turns (fault class, confidence, ranked contributions, observed
 values) into a DiagnosisResult with a severity and a recommended action.
 Explainability a meteorologist cannot read is not explainability.
@@ -15,19 +15,19 @@ from ..config import DEFAULT_CONFIG, ShapleyConfig
 from ..types import DiagnosisResult, EvidenceLine, FaultClass, Severity
 
 # One recommended action per fault class. Concrete first ("inspect wiring"),
-# never a shrug — an alert without an action is just anxiety.
+# never a shrug: an alert without an action is just anxiety.
 RECOMMENDED_ACTIONS: Dict[FaultClass, str] = {
     FaultClass.NONE: "No action required. Observation accepted.",
     FaultClass.SPIKE: "Inspect temperature sensor and wiring for intermittent contact. Mark observation suspect.",
     FaultClass.DROP: "Inspect sensor for dropout or power dip. Mark observation suspect.",
     FaultClass.STUCK: "Inspect sensor for stuck/frozen output; check ventilation and power. Schedule maintenance visit.",
-    FaultClass.DRIFT: "Sensor shows growing bias — schedule recalibration before it becomes a hard fault.",
-    FaultClass.STEP: "Permanent level shift detected — check for sensor replacement or repositioning event, then recalibrate.",
-    FaultClass.NOISE: "Abnormal signal variance — check shielding, grounding and power stability.",
-    FaultClass.MISSING: "Communication outage — check telemetry link, power and logger status.",
-    FaultClass.CORRUPT: "Corrupt encoding received — check telemetry chain for truncation or byte errors.",
-    FaultClass.MULTIVARIATE: "Variables jointly inconsistent — cross-check all three sensors; likely one has drifted.",
-    FaultClass.SPATIAL: "Station disagrees with neighbours — verify on-site conditions, then inspect sensors.",
+    FaultClass.DRIFT: "Sensor shows growing bias: schedule recalibration before it becomes a hard fault.",
+    FaultClass.STEP: "Permanent level shift detected: check for sensor replacement or repositioning event, then recalibrate.",
+    FaultClass.NOISE: "Abnormal signal variance: check shielding, grounding and power stability.",
+    FaultClass.MISSING: "Communication outage: check telemetry link, power and logger status.",
+    FaultClass.CORRUPT: "Corrupt encoding received: check telemetry chain for truncation or byte errors.",
+    FaultClass.MULTIVARIATE: "Variables jointly inconsistent: cross-check all three sensors; likely one has drifted.",
+    FaultClass.SPATIAL: "Station disagrees with neighbours: verify on-site conditions, then inspect sensors.",
     FaultClass.GENUINE_EXTREME: "Real extreme weather confirmed by context. Trust the observation; no maintenance action.",
 }
 

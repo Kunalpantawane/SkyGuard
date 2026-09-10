@@ -1,0 +1,9 @@
+station_id,name,lat,lon,elevation_m,terrain
+PUNE,Pune,18.5204,73.8567,560.0,valley
+MUMBAI,Mumbai Santacruz,19.0887,72.8679,14.0,coastal
+NASHIK,Nashik,19.9975,73.7898,584.0,plateau
+AHMEDNAGAR,Ahmednagar,19.0952,74.7496,649.0,inland
+SOLAPUR,Solapur,17.6599,75.9064,457.0,plateau
+SATARA,Satara,17.6805,74.0183,742.0,hill
+RATNAGIRI,Ratnagiri,16.9902,73.312,67.0,coastal
+MAHABALESHWAR,Mahabaleshwar,17.9307,73.6477,1353.0,hill

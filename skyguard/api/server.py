@@ -37,11 +37,36 @@ from ..types import Observation, Station
 
 _VERSION = "1.0.0"
 
+# Repo root (server.py lives at skyguard/api/), where `.env` lives next to it.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _load_dotenv(path: Path | None = None) -> None:
+    """Minimal KEY=VALUE loader, stdlib only (no python-dotenv dependency).
+
+    Real environment variables always win; the file only fills gaps. Missing
+    file, blank lines, and `#` comments are silently fine.
+    """
+    target = path or (_REPO_ROOT / ".env")
+    try:
+        text = target.read_text(encoding="utf-8")
+    except OSError:
+        return
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip().strip("\"'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
 
 def _read_token(config: ApiConfig, override: Optional[str]) -> str:
-    """Bearer token: explicit override wins, otherwise the env var."""
+    """Bearer token: explicit override wins, then env var, then `.env` file."""
     if override is not None:
         return override
+    _load_dotenv()
     return os.environ.get(config.token_env_var, "")
 
 

@@ -26,7 +26,7 @@ import numpy as np
 
 from ..config import VARIABLES, InjectorConfig
 from ..types import FaultClass, InjectedFault
-from .simulator import SimulatedNetwork, dewpoint_from_rh
+from .network import StationNetwork, dewpoint_from_rh
 
 
 class InjectionResult:
@@ -34,8 +34,8 @@ class InjectionResult:
 
     def __init__(
         self,
-        network: SimulatedNetwork,
-        clean: SimulatedNetwork,
+        network: StationNetwork,
+        clean: StationNetwork,
         faults: List[InjectedFault],
     ) -> None:
         self.network = network      # faulted data — what the detector sees
@@ -221,7 +221,7 @@ def _inject_corrupt(
 
 def _inject_multivariate(
     rng: np.random.Generator,
-    net: SimulatedNetwork,
+    net: StationNetwork,
     s_idx: int,
     idx: int,
 ) -> Tuple[int, int, str, float]:
@@ -255,7 +255,7 @@ def _inject_multivariate(
 
 def _inject_spatial(
     rng: np.random.Generator,
-    net: SimulatedNetwork,
+    net: StationNetwork,
     s_idx: int,
     idx: int,
     cfg: InjectorConfig,
@@ -336,7 +336,7 @@ def _robust_sigma(series: np.ndarray) -> float:
 
 
 def inject_faults(
-    clean: SimulatedNetwork,
+    clean: StationNetwork,
     cfg: InjectorConfig | None = None,
     index_range: Optional[Tuple[int, int]] = None,
 ) -> InjectionResult:
@@ -357,10 +357,10 @@ def inject_faults(
 
     faults: List[InjectedFault] = []
 
-    # Record the simulator's genuine extreme events as ground truth so the
-    # harness can measure false alarms on real weather.
+    # Record the network's genuine extreme-weather events as ground truth so
+    # the harness can measure false alarms on real weather.
     #
-    # The simulator reports windows as half-open [start, end); InjectedFault's
+    # Events carry half-open windows [start, end); InjectedFault's
     # end_index is inclusive. Converting requires end - 1. Skipping that step
     # labels one extra point after every event as genuine weather, which both
     # inflates the false-alarm denominator and blocks a fault from being placed
@@ -407,7 +407,7 @@ def inject_faults(
         i: np.zeros(net.n_steps, dtype=bool) for i in range(net.n_stations)
     }
     for ev in net.genuine_events:
-        # Half-open [start, end) from the simulator, so the inclusive last index
+        # Half-open [start, end) on the event, so the inclusive last index
         # is end - 1; see the GENUINE_EXTREME truth block above.
         s, e = max(int(ev["start"]), lo), min(int(ev["end"]) - 1, hi)
         if e >= s:
@@ -561,7 +561,7 @@ def inject_faults(
     return InjectionResult(network=net, clean=clean, faults=faults)
 
 
-def _clip_preserving_faults(net: SimulatedNetwork, faults: List[InjectedFault]) -> None:
+def _clip_preserving_faults(net: StationNetwork, faults: List[InjectedFault]) -> None:
     """Keep RH within 0-100 without erasing injected corruption.
 
     A blanket clip would silently convert every sentinel 999 into 100 and destroy

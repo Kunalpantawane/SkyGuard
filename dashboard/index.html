@@ -3,127 +3,686 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SkyGuard AI — AWS Quality Assurance</title>
+<title>SkyGuard AI — AWS Quality Assurance & Real-Time Anomaly Detection</title>
 <style>
-  :root { --bg: #0e1420; --panel: #182233; --ink: #dfe8f5; --dim: #8fa1bd;
-          --ok: #3ecf8e; --warn: #f5b83d; --bad: #ff5d5d; --line: #2a3a55; }
+  :root {
+    --bg: #0e1420;
+    --panel: #141c2c;
+    --panel-hover: #1b263b;
+    --ink: #dfe8f5;
+    --dim: #8fa1bd;
+    --line: #223046;
+    --ok: #3ecf8e;
+    --warn: #f5b83d;
+    --bad: #ff5d5d;
+    --info: #3b82f6;
+    --accent: #8b5cf6;
+    --dew: #ec4899;
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink);
-         font: 14px/1.45 system-ui, sans-serif; }
-  header { display: flex; gap: 12px; align-items: center; padding: 12px 16px;
-           border-bottom: 1px solid var(--line); }
-  header h1 { font-size: 17px; margin: 0; }
-  header input { background: var(--panel); color: var(--ink); border: 1px solid var(--line);
-                 border-radius: 6px; padding: 6px 8px; width: 260px; }
-  main { display: grid; grid-template-columns: 240px 1fr 320px; gap: 12px; padding: 12px; }
-  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 0 0 8px; }
-  #stations button { display: block; width: 100%; text-align: left; margin: 2px 0;
-    background: none; border: 1px solid transparent; color: var(--ink);
-    border-radius: 6px; padding: 6px 8px; cursor: pointer; }
-  #stations button.sel { border-color: var(--warn); }
-  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
-  .ok { background: var(--ok); } .warn { background: var(--warn); } .bad { background: var(--bad); }
-  svg.chart { width: 100%; height: 150px; background: #101827; border-radius: 6px; }
-  #verdict { font-size: 15px; font-weight: 600; }
-  #evidence li { margin-bottom: 4px; }
-  .mono { font-family: ui-monospace, monospace; font-size: 12px; }
-  #anoms div { border-bottom: 1px solid var(--line); padding: 4px 0; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 13px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  
+  /* Emergency Alert Banner */
+  #alert-banner {
+    display: none;
+    background: linear-gradient(90deg, #991b1b, #dc2626);
+    color: #fff;
+    padding: 8px 16px;
+    font-weight: 600;
+    font-size: 13px;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 10px rgba(220, 38, 38, 0.4);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  #alert-banner .alert-title { font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+
+  /* Header */
+  header {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 {
+    font-size: 16px;
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  header h1 span {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  header input {
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 10px;
+    width: 220px;
+    font-size: 12px;
+  }
+  header button {
+    background: var(--info);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 12px;
+    transition: opacity 0.15s;
+  }
+  header button:hover { opacity: 0.9; }
+  .net-badge {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--dim);
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 8px var(--ok);
+  }
+
+  /* Grid Layout */
+  main {
+    display: grid;
+    grid-template-columns: 280px 1fr 340px;
+    gap: 12px;
+    padding: 12px;
+    min-height: calc(100vh - 50px);
+  }
+  
+  @media (max-width: 1200px) {
+    main { grid-template-columns: 240px 1fr; }
+    .right-sidebar { grid-column: span 2; }
+  }
+
+  section {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--dim);
+    margin: 0 0 6px;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Station Selector & Map */
+  .station-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    text-align: left;
+    margin: 3px 0;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+  }
+  .station-item:hover { background: var(--panel-hover); }
+  .station-item.sel {
+    background: var(--panel-hover);
+    border-color: var(--info);
+    font-weight: 600;
+  }
+  .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .ok { background: var(--ok); }
+  .warn { background: var(--warn); }
+  .bad { background: var(--bad); }
+  .dim { background: var(--dim); }
+
+  /* Hand-rolled SVG Map */
+  #map-container {
+    width: 100%;
+    height: 180px;
+    background: #090e17;
+    border-radius: 6px;
+    border: 1px solid var(--line);
+    position: relative;
+    overflow: hidden;
+  }
+  #map-svg { width: 100%; height: 100%; }
+
+  /* Station Title & Status Chips */
+  .st-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 8px;
+  }
+  .st-title { font-size: 16px; font-weight: 700; color: #fff; margin: 0; }
+  .st-meta { font-size: 11px; color: var(--dim); font-family: ui-monospace, monospace; }
+  
+  .badge-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .chip {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 12px;
+    letter-spacing: 0.05em;
+  }
+  .chip-ok { background: rgba(62, 207, 142, 0.15); color: var(--ok); border: 1px solid var(--ok); }
+  .chip-warn { background: rgba(245, 184, 61, 0.15); color: var(--warn); border: 1px solid var(--warn); }
+  .chip-bad { background: rgba(255, 93, 93, 0.15); color: var(--bad); border: 1px solid var(--bad); }
+  .chip-info { background: rgba(59, 130, 246, 0.15); color: var(--info); border: 1px solid var(--info); }
+  .chip-purple { background: rgba(139, 92, 246, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+
+  /* Hand-rolled SVG Chart */
+  .chart-box {
+    background: #0b101a;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px;
+  }
+  .chart-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--dim);
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .chart-title span.val { color: var(--ink); font-family: ui-monospace, monospace; }
+  svg.chart-svg { width: 100%; height: 125px; display: block; }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 12px;
+    font-size: 10px;
+    color: var(--dim);
+    margin-top: 4px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-line { width: 14px; height: 2px; }
+
+  /* XAI Diagnostic Panel */
+  .verdict-box {
+    background: #0b101a;
+    border-radius: 6px;
+    padding: 10px;
+    border-left: 3px solid var(--ok);
+  }
+  .verdict-box.bad { border-left-color: var(--bad); }
+  .verdict-box.warn { border-left-color: var(--warn); }
+  
+  .verdict-title { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .verdict-sub { font-size: 11px; color: var(--dim); }
+
+  .evidence-bar-container { margin-bottom: 6px; }
+  .evidence-header { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px; }
+  .bar-bg { width: 100%; height: 6px; background: #090e17; border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--info); border-radius: 3px; transition: width 0.3s; }
+
+  .narrative-box {
+    background: #090e17;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 11px;
+    color: var(--ink);
+    line-height: 1.4;
+  }
+
+  /* Sensor Health Gauges */
+  .health-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .health-card {
+    background: #0b101a;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px;
+    text-align: center;
+  }
+  .health-card .score { font-size: 18px; font-weight: 700; color: var(--ok); font-family: ui-monospace, monospace; }
+  .health-card .lbl { font-size: 10px; color: var(--dim); text-transform: uppercase; margin-top: 2px; }
+
+  /* Anomaly Worklist */
+  .anom-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+  .anom-item {
+    background: #0b101a;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .anom-item .ts { font-family: ui-monospace, monospace; color: var(--dim); font-size: 10px; }
+  .mono { font-family: ui-monospace, monospace; }
 </style>
 </head>
 <body>
+
+<div id="alert-banner">
+  <div>
+    <span class="alert-title">CRITICAL FAULT DETECTED</span> — 
+    <span id="alert-text">Station S1: Temperature Sensor Spike (p=0.98)</span>
+  </div>
+  <button onclick="dismissAlert()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; border-radius:4px; padding:2px 8px; cursor:pointer; font-size:11px;">Dismiss</button>
+</div>
+
 <header>
-  <h1>SkyGuard AI</h1>
+  <h1>SkyGuard <span>AI</span></h1>
   <input id="token" type="password" placeholder="API bearer token">
   <button id="go">Connect</button>
-  <span id="net" class="mono"></span>
+  <div class="net-badge">
+    <div class="pulse-dot" id="net-dot"></div>
+    <span id="net">Offline</span>
+  </div>
 </header>
+
 <main>
-  <section><h2>Stations</h2><div id="stations"></div></section>
+  <!-- Left Sidebar: Stations & Spatial Map -->
   <section>
-    <h2 id="stitle">Station</h2>
-    <div id="charts"></div>
+    <h2>AWS Network Stations <span id="st-count" class="mono">(0)</span></h2>
+    <div id="stations" style="max-height: 240px; overflow-y: auto;"></div>
+
+    <h2>Spatial Station Map</h2>
+    <div id="map-container">
+      <svg id="map-svg" viewBox="0 0 280 180"></svg>
+    </div>
   </section>
+
+  <!-- Center Section: Multi-Variable Time-Series & Anomaly Scores -->
   <section>
-    <h2>Latest verdict</h2>
-    <div id="verdict">—</div>
-    <ul id="evidence"></ul>
-    <h2>Anomaly worklist</h2>
-    <div id="anoms"></div>
+    <div class="st-header">
+      <div>
+        <h1 class="st-title" id="stitle">Select a Station</h1>
+        <div class="st-meta" id="smeta">—</div>
+      </div>
+      <div class="badge-row" id="sbadges">
+        <span class="chip chip-ok">PASS</span>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-line" style="background:#7db4ff;"></div> Raw Input</div>
+      <div class="legend-item"><div class="legend-line" style="background:#3ecf8e; border-top:1px dashed #3ecf8e;"></div> Imputed Target</div>
+      <div class="legend-item"><div class="legend-line" style="background:#ec4899;"></div> Dew Point</div>
+      <div class="legend-item"><div class="legend-line" style="background:#ff5d5d;"></div> Anomaly Marker</div>
+    </div>
+
+    <div id="charts" style="display: flex; flex-direction: column; gap: 8px;"></div>
+  </section>
+
+  <!-- Right Sidebar: XAI Diagnostics & Sensor Health -->
+  <section class="right-sidebar">
+    <h2>Latest Diagnostic Verdict</h2>
+    <div id="verdict-card" class="verdict-box">
+      <div class="verdict-title" id="verdict-class">Normal Stream</div>
+      <div class="verdict-sub" id="verdict-sub">p=0.00 — CLEAR</div>
+    </div>
+
+    <h2>Shapley Evidence Breakdown</h2>
+    <div id="evidence-bars">
+      <div style="font-size:11px; color:var(--dim);">No active anomaly evidence.</div>
+    </div>
+
+    <h2>Actionable Operator Narrative</h2>
+    <div id="narrative" class="narrative-box">
+      Routine monitoring state. All sensor values remain within estimated physical bounds.
+    </div>
+
+    <h2>Sensor Health Ledger</h2>
+    <div class="health-grid" id="health-gauges">
+      <div class="health-card">
+        <div class="score" style="color:var(--ok);">100%</div>
+        <div class="lbl">Temp</div>
+      </div>
+      <div class="health-card">
+        <div class="score" style="color:var(--ok);">100%</div>
+        <div class="lbl">Pressure</div>
+      </div>
+      <div class="health-card">
+        <div class="score" style="color:var(--ok);">100%</div>
+        <div class="lbl">Humidity</div>
+      </div>
+    </div>
+
+    <h2>Anomaly Worklist <span id="anom-count" class="mono">(0)</span></h2>
+    <div class="anom-list" id="anoms">
+      <div style="font-size:11px; color:var(--dim);">No anomalies recorded.</div>
+    </div>
   </section>
 </main>
+
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
-let base = location.origin, stationId = null;
+let base = location.origin, stationId = null, stationList = [];
 
 function auth() {
   const t = $("token").value.trim();
   if (t) sessionStorage.setItem("sg_token", t);
   return { "Authorization": "Bearer " + (t || sessionStorage.getItem("sg_token") || "") };
 }
+
 async function get(path) {
   const r = await fetch(base + path, { headers: auth() });
   if (!r.ok) throw new Error(path + " -> " + r.status);
   return r.json();
 }
-// Hand-rolled SVG line chart with anomaly markers. No libraries, no build.
-function chart(el, label, unit, points) {
-  const W = 640, H = 150, P = 8;
-  const vals = points.map(p => p.v).filter(v => v !== null);
-  if (!vals.length) { el.innerHTML = ""; return; }
-  let lo = Math.min(...vals), hi = Math.max(...vals);
-  if (hi === lo) { hi = lo + 1; }
-  const X = i => P + i * (W - 2 * P) / Math.max(points.length - 1, 1);
-  const Y = v => H - P - (v - lo) * (H - 2 * P) / (hi - lo);
-  let d = "";
-  points.forEach((p, i) => { if (p.v !== null) d += (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p.v).toFixed(1) + " "; });
-  let dots = points.filter(p => p.v !== null && p.bad)
-    .map(p => `<circle cx="${X(p.i)}" cy="${Y(p.v)}" r="3.5" fill="#ff5d5d"/>`).join("");
-  el.innerHTML = `<h2>${label} (${unit}) — last ${points[points.length-1].v}</h2>` +
-    `<svg class="chart" viewBox="0 0 ${W} ${H}"><path d="${d}" stroke="#7db4ff" fill="none" stroke-width="1.5"/>${dots}</svg>`;
+
+function dismissAlert() {
+  $("alert-banner").style.display = "none";
 }
+
+function showAlert(text) {
+  $("alert-text").textContent = text;
+  $("alert-banner").style.display = "flex";
+}
+
+// Render Hand-rolled SVG Time-Series Chart
+function renderChart(el, label, unit, rawPts, impPts, dewPts, isScoreChart) {
+  const W = 600, H = 125, P = 6;
+  const allVals = [...rawPts, ...(impPts || []), ...(dewPts || [])].map(p => p.v).filter(v => v !== null && isFinite(v));
+  if (!allVals.length) { el.innerHTML = ""; return; }
+  
+  let lo = Math.min(...allVals), hi = Math.max(...allVals);
+  if (hi === lo) { hi = lo + 1; }
+  
+  const X = i => P + i * (W - 2 * P) / Math.max(rawPts.length - 1, 1);
+  const Y = v => H - P - (v - lo) * (H - 2 * P) / (hi - lo);
+  
+  // Path generator
+  const makePath = pts => {
+    let d = "";
+    pts.forEach((p, i) => {
+      if (p.v !== null && isFinite(p.v)) {
+        d += (d ? "L" : "M") + X(i).toFixed(1) + " " + Y(p.v).toFixed(1) + " ";
+      }
+    });
+    return d;
+  };
+
+  const dRaw = makePath(rawPts);
+  const dImp = impPts ? makePath(impPts) : "";
+  const dDew = dewPts ? makePath(dewPts) : "";
+  
+  // Anomaly dots
+  const dots = rawPts.filter(p => p.v !== null && p.bad)
+    .map(p => `<circle cx="${X(p.i)}" cy="${Y(p.v)}" r="4" fill="#ff5d5d" stroke="#000" stroke-width="1"/>`).join("");
+
+  const strokeColor = isScoreChart ? "#8b5cf6" : "#7db4ff";
+  const lastVal = rawPts.length ? rawPts[rawPts.length - 1].v : null;
+  const lastValStr = lastVal !== null ? lastVal.toFixed(1) : "—";
+
+  el.innerHTML = `
+    <div class="chart-box">
+      <div class="chart-title">
+        <span>${label} (${unit})</span>
+        <span class="val">Latest: ${lastValStr} ${unit}</span>
+      </div>
+      <svg class="chart-svg" viewBox="0 0 ${W} ${H}">
+        <!-- Gridlines -->
+        <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#182233" stroke-dasharray="3,3"/>
+        ${dDew ? `<path d="${dDew}" stroke="#ec4899" fill="none" stroke-width="1.2" stroke-dasharray="4,2"/>` : ''}
+        ${dImp ? `<path d="${dImp}" stroke="#3ecf8e" fill="none" stroke-width="1.5" stroke-dasharray="4,3"/>` : ''}
+        ${dRaw ? `<path d="${dRaw}" stroke="${strokeColor}" fill="none" stroke-width="1.8"/>` : ''}
+        ${dots}
+      </svg>
+    </div>
+  `;
+}
+
+// Render Hand-rolled Spatial Map SVG
+function renderMap(stations, activeId) {
+  const svg = $("map-svg");
+  if (!stations.length) { svg.innerHTML = ""; return; }
+  
+  const lats = stations.map(s => s.lat), lons = stations.map(s => s.lon);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+  
+  const pad = 20, W = 280, H = 180;
+  const mapX = lon => pad + (lon - minLon) * (W - 2 * pad) / (maxLon - minLon || 1);
+  const mapY = lat => H - pad - (lat - minLat) * (H - 2 * pad) / (maxLat - minLat || 1);
+  
+  let content = "";
+  
+  // Connection links between stations
+  for (let i = 0; i < stations.length; i++) {
+    for (let j = i + 1; j < stations.length; j++) {
+      const x1 = mapX(stations[i].lon), y1 = mapY(stations[i].lat);
+      const x2 = mapX(stations[j].lon), y2 = mapY(stations[j].lat);
+      content += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#1e293b" stroke-width="1"/>`;
+    }
+  }
+  
+  // Station dots
+  stations.forEach(s => {
+    const cx = mapX(s.lon), cy = mapY(s.lat);
+    const isSel = s.station_id === activeId;
+    const color = isSel ? "#f5b83d" : "#3ecf8e";
+    const r = isSel ? 6 : 4;
+    content += `
+      <circle cx="${cx}" cy="${cy}" r="${r+3}" fill="${color}" opacity="0.2"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" stroke="#fff" stroke-width="${isSel?1.5:0.5}" style="cursor:pointer;" onclick="selectStation('${s.station_id}')"/>
+      <text x="${cx}" y="${cy - 8}" fill="#8fa1bd" font-size="9" text-anchor="middle" font-family="sans-serif">${s.station_id}</text>
+    `;
+  });
+  
+  svg.innerHTML = content;
+}
+
+window.selectStation = id => {
+  stationId = id;
+  loadStation();
+};
+
 async function loadStations() {
   const data = await get("/stations");
-  const box = $("stations"); box.innerHTML = "";
-  $("net").textContent = data.stations.length + " stations";
-  data.stations.forEach(s => {
+  stationList = data.stations || [];
+  const box = $("stations");
+  box.innerHTML = "";
+  $("st-count").textContent = `(${stationList.length})`;
+  $("net").textContent = `Connected (${stationList.length} STNs)`;
+  $("net-dot").style.background = "var(--ok)";
+  
+  stationList.forEach(s => {
     const b = document.createElement("button");
-    b.textContent = s.station_id + " — " + s.name;
+    b.className = "station-item" + (s.station_id === stationId ? " sel" : "");
+    b.innerHTML = `
+      <span><span class="dot ok"></span> <b>${s.station_id}</b> — ${s.name}</span>
+      <span class="mono" style="font-size:10px; color:var(--dim);">${s.elevation_m}m</span>
+    `;
     b.onclick = () => { stationId = s.station_id; loadStation(); };
     box.appendChild(b);
   });
-  if (data.stations.length && !stationId) { stationId = data.stations[0].station_id; loadStation(); }
-}
-async function loadStation() {
-  document.querySelectorAll("#stations button").forEach(b =>
-    b.classList.toggle("sel", b.textContent.startsWith(stationId + " ")));
-  $("stitle").textContent = stationId;
-  const data = await get(`/stations/${stationId}/records?limit=120`);
-  const recs = data.records;
-  const mk = key => recs.map((r, i) => ({ i, v: r.observation[key],
-    bad: r.fusion.is_anomaly }));
-  const box = $("charts"); box.innerHTML = "";
-  [["Temperature", "°C", "temp_c"], ["Pressure", "hPa", "pressure_hpa"],
-   ["Humidity", "%", "rh_pct"]].forEach(([label, unit, key]) => {
-    const div = document.createElement("div"); box.appendChild(div);
-    chart(div, label, unit, mk(key));
-  });
-  const last = recs[recs.length - 1];
-  if (last) {
-    $("verdict").textContent = `${last.fusion.band} p=${last.fusion.probability.toFixed(2)} — ${last.diagnosis.fault_class}`;
-    $("evidence").innerHTML = last.diagnosis.evidence
-      .map(e => `<li><b>${e.label}</b> (${(e.contribution * 100).toFixed(0)}%)<br><span class="mono">${e.detail}</span></li>`).join("")
-      || "<li>No contributing evidence.</li>";
+
+  if (stationList.length && !stationId) {
+    stationId = stationList[0].station_id;
   }
-  const anoms = await get(`/anomalies?station=${stationId}&limit=20`);
-  $("anoms").innerHTML = anoms.anomalies
-    .map(a => `<div class="mono">${a.observation.timestamp}<br>${a.diagnosis.fault_class} p=${a.fusion.probability.toFixed(2)}</div>`).join("")
-    || "<div>None.</div>";
+  renderMap(stationList, stationId);
+  if (stationId) loadStation();
 }
-$("go").onclick = () => loadStations().catch(e => { $("net").textContent = String(e); });
+
+async function loadStation() {
+  if (!stationId) return;
+  
+  document.querySelectorAll(".station-item").forEach(b => {
+    b.classList.toggle("sel", b.textContent.includes(stationId));
+  });
+  
+  renderMap(stationList, stationId);
+  
+  const stObj = stationList.find(s => s.station_id === stationId);
+  $("stitle").textContent = `${stationId} — ${stObj ? stObj.name : 'Station'}`;
+  $("smeta").textContent = stObj ? `Lat: ${stObj.lat.toFixed(2)}, Lon: ${stObj.lon.toFixed(2)} | Elev: ${stObj.elevation_m}m | Terrain: ${stObj.terrain}` : '—';
+  
+  const data = await get(`/stations/${stationId}/records?limit=120`);
+  const recs = data.records || [];
+  if (!recs.length) return;
+  
+  const last = recs[recs.length - 1];
+  
+  // Status Badges
+  const band = last.fusion.band;
+  const isAnom = last.fusion.is_anomaly;
+  const qcStat = last.qc_status;
+  
+  const chipClass = isAnom ? "chip-bad" : (band === "WATCH" || band === "SUSPICIOUS" ? "chip-warn" : "chip-ok");
+  $("sbadges").innerHTML = `
+    <span class="chip ${chipClass}">${qcStat}</span>
+    <span class="chip ${chipClass}">${band}</span>
+    <span class="chip chip-info">FAULT: ${last.diagnosis.fault_class}</span>
+    ${last.fusion.genuine_weather_damped ? `<span class="chip chip-purple">GENUINE WEATHER</span>` : ''}
+  `;
+  
+  // Render Charts
+  const box = $("charts");
+  box.innerHTML = "";
+  
+  // Data extractors
+  const mkSeries = key => recs.map((r, i) => ({ i, v: r.observation[key], bad: r.fusion.is_anomaly }));
+  const mkImpSeries = key => recs.map((r, i) => ({ i, v: r.correction.available ? r.correction.values[key] : r.observation[key] }));
+  const mkDewSeries = () => recs.map((r, i) => ({ i, v: r.multivariate.dewpoint_c }));
+  const mkScoreSeries = () => recs.map((r, i) => ({ i, v: r.fusion.probability, bad: r.fusion.is_anomaly }));
+  
+  // 1. Temp Chart
+  const divT = document.createElement("div"); box.appendChild(divT);
+  renderChart(divT, "Temperature", "°C", mkSeries("temp_c"), mkImpSeries("temp_c"), null, false);
+  
+  // 2. Pressure Chart
+  const divP = document.createElement("div"); box.appendChild(divP);
+  renderChart(divP, "Pressure", "hPa", mkSeries("pressure_hpa"), mkImpSeries("pressure_hpa"), null, false);
+  
+  // 3. Humidity Chart (with Dew Point)
+  const divRH = document.createElement("div"); box.appendChild(divRH);
+  renderChart(divRH, "Relative Humidity", "%", mkSeries("rh_pct"), mkImpSeries("rh_pct"), mkDewSeries(), false);
+  
+  // 4. Anomaly Probability Score Chart
+  const divScore = document.createElement("div"); box.appendChild(divScore);
+  renderChart(divScore, "Fused Anomaly Probability P(anomaly)", "score", mkScoreSeries(), null, null, true);
+
+  // Diagnostic Verdict Card
+  const vBox = $("verdict-card");
+  vBox.className = "verdict-box " + (isAnom ? "bad" : (band !== "NORMAL" ? "warn" : ""));
+  $("verdict-class").textContent = `${last.diagnosis.fault_class.toUpperCase()} — ${last.diagnosis.severity}`;
+  $("verdict-sub").textContent = `Probability: ${last.fusion.probability.toFixed(2)} | Confidence Band: ${band}`;
+  
+  // Trigger alert banner if critical
+  if (isAnom && (last.diagnosis.severity === "CRITICAL" || last.diagnosis.severity === "HIGH")) {
+    showAlert(`Station ${stationId}: ${last.diagnosis.fault_class.toUpperCase()} anomaly (p=${last.fusion.probability.toFixed(2)})`);
+  }
+
+  // Shapley Evidence Bars
+  const evBox = $("evidence-bars");
+  const evList = last.diagnosis.evidence || [];
+  if (evList.length) {
+    evBox.innerHTML = evList.map(e => {
+      const pct = (e.contribution * 100).toFixed(0);
+      return `
+        <div class="evidence-bar-container">
+          <div class="evidence-header">
+            <span><b>${e.label}</b></span>
+            <span class="mono">${pct}%</span>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;"></div></div>
+          <div style="font-size:10px; color:var(--dim); margin-top:2px;">${e.detail}</div>
+        </div>
+      `;
+    }).join("");
+  } else {
+    evBox.innerHTML = `<div style="font-size:11px; color:var(--dim);">No active anomaly evidence.</div>`;
+  }
+  
+  // Narrative
+  $("narrative").textContent = last.diagnosis.recommended_action || last.explanation || "Routine monitoring state. All metrics within clean thresholds.";
+
+  // Sensor Health Gauges
+  const hGauges = $("health-gauges");
+  hGauges.innerHTML = ["temp_c", "pressure_hpa", "rh_pct"].map(v => {
+    const lbl = v === "temp_c" ? "Temp" : (v === "pressure_hpa" ? "Pressure" : "Humidity");
+    // Calculate health score from reconstruction error
+    const err = last.recon.per_variable ? (last.recon.per_variable[v] || 0) : 0;
+    const score = Math.max(0, Math.min(100, Math.round(100 - err * 100)));
+    const color = score > 80 ? "var(--ok)" : (score > 50 ? "var(--warn)" : "var(--bad)");
+    return `
+      <div class="health-card">
+        <div class="score" style="color:${color};">${score}%</div>
+        <div class="lbl">${lbl}</div>
+      </div>
+    `;
+  }).join("");
+
+  // Anomaly Worklist
+  const anomData = await get(`/anomalies?station=${stationId}&limit=10`);
+  const anoms = anomData.anomalies || [];
+  $("anom-count").textContent = `(${anoms.length})`;
+  const anomBox = $("anoms");
+  if (anoms.length) {
+    anomBox.innerHTML = anoms.map(a => `
+      <div class="anom-item">
+        <div>
+          <div style="font-weight:600; color:var(--bad);">${a.diagnosis.fault_class.toUpperCase()}</div>
+          <div class="ts">${a.observation.timestamp}</div>
+        </div>
+        <div class="mono" style="font-weight:700;">p=${a.fusion.probability.toFixed(2)}</div>
+      </div>
+    `).join("");
+  } else {
+    anomBox.innerHTML = `<div style="font-size:11px; color:var(--dim);">No anomalies recorded.</div>`;
+  }
+}
+
+$("go").onclick = () => loadStations().catch(e => {
+  $("net").textContent = "Connection failed: " + String(e.message || e);
+  $("net-dot").style.background = "var(--bad)";
+});
 $("token").value = sessionStorage.getItem("sg_token") || "";
-loadStations().catch(() => { $("net").textContent = "enter token, press Connect"; });
+
+loadStations().catch(() => {
+  $("net").textContent = "Enter token & press Connect";
+  $("net-dot").style.background = "var(--warn)";
+});
 </script>
 </body>
 </html>

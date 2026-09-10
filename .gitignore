@@ -21,3 +21,9 @@ Thumbs.db
 # Local secrets (API tokens live in env vars, see skyguard/config.py ApiConfig)
 .env
 
+# Local runtime databases (created by serve.py / API runs)
+*.db
+*.sqlite3
+*.db-wal
+*.db-shm
+

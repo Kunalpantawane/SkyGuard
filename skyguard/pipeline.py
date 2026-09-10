@@ -20,7 +20,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field, replace
 from datetime import timezone
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import numpy as np
 
@@ -98,6 +98,7 @@ class SkyGuardPipeline:
         rules: RuleEngine | None = None,
         classifier: FaultClassifier | None = None,
         store: AuditStore | None = None,
+        fingerprint_sink: Callable[[Observation, List[float]], None] | None = None,
     ) -> None:
         self.config: Config = config or DEFAULT_CONFIG
         # The window geometry belongs to the model artifact, not the pipeline:
@@ -113,6 +114,11 @@ class SkyGuardPipeline:
         self.fusion = fusion or FusionEngine(config=self.config.fusion)
         self.classifier = classifier
         self.store = store
+        # Training the Layer 6 forest needs the same 14-column fingerprints the
+        # pipeline builds at inference, and rebuilding them outside would be a
+        # second implementation of the feature contract waiting to drift. The
+        # sink hands each one out as it is built; None means nobody is watching.
+        self.fingerprint_sink = fingerprint_sink
         self._streams: Dict[str, _StationStream] = {}
 
     # -- state ------------------------------------------------------------
@@ -166,6 +172,8 @@ class SkyGuardPipeline:
 
         fingerprint = self._fingerprint(obs, stream, levels, complete,
                                         recon_result, multi_result, spatial_result, rule_result)
+        if self.fingerprint_sink is not None and fingerprint is not None:
+            self.fingerprint_sink(obs, fingerprint)
         diagnosis = self._diagnose(obs, stream, levels, complete, fused, fingerprint, explain)
         correction = self._correct(obs, stream, levels, complete, fused,
                                    recon_result, reconstruction, spatial_result)
@@ -378,7 +386,7 @@ class SkyGuardPipeline:
         if diagnosis.fault_class != FaultClass.NONE:
             text += f" | {diagnosis.fault_class.value} ({diagnosis.confidence:.0%})"
             if diagnosis.evidence:
-                text += f" — {diagnosis.evidence[0].label}"
+                text += f" via {diagnosis.evidence[0].label}"
         if fused.genuine_weather_damped:
             text += " [weather-damped]"
         if fused.dominant_variable:

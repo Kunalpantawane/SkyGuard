@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkyGuard AI: model evidence</title>
+<style>
+  :root {
+    --bg: #0e1420;
+    --panel: #141c2c;
+    --raised: #1b263b;
+    --ink: #dfe8f5;
+    --dim: #8fa1bd;
+    --faint: #5d6f8c;
+    --line: #223046;
+    --ok: #3ecf8e;
+    --warn: #f5b83d;
+    --bad: #ff5d5d;
+    /* Categorical series slots, validated for this surface:
+       adjacent CVD dE 9.4, normal-vision dE 26.5, all above 3:1 contrast. */
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    --grid: #1d283c;
+    --measure: 74ch;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { animation: none !important; transition: none !important; }
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 400 14px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px 96px; }
+  a { color: var(--s1); }
+  code, .mono {
+    font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, monospace;
+    font-size: 0.86em;
+  }
+
+  /* ---- run stamp ------------------------------------------------------ */
+  .stamp {
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #131d2f, var(--bg));
+    padding: 34px 0 22px;
+    margin-bottom: 8px;
+  }
+  .stamp h1 {
+    margin: 0 0 6px;
+    font-size: 27px;
+    font-weight: 620;
+    letter-spacing: -0.02em;
+  }
+  .stamp p.lede { margin: 0 0 20px; color: var(--dim); max-width: var(--measure); }
+  .provenance {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid rgba(62,207,142,.4);
+    background: rgba(62,207,142,.09);
+    color: var(--ok);
+    border-radius: 999px;
+    padding: 4px 13px 4px 10px;
+    font-size: 12px; font-weight: 600;
+    margin-bottom: 14px;
+  }
+  .provenance.synthetic { border-color: rgba(245,184,61,.4); background: rgba(245,184,61,.09); color: var(--warn); }
+  .provenance b { font-weight: 700; }
+  dl.facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px 26px; margin: 0;
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
+  }
+  dl.facts div { min-width: 0; }
+  dl.facts dt { color: var(--faint); font-size: 11.5px; margin-bottom: 2px; }
+  dl.facts dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+
+  /* ---- sections ------------------------------------------------------- */
+  section { padding-top: 46px; }
+  .head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+  .head .n {
+    color: var(--faint); font-size: 12px; font-weight: 700;
+    min-width: 20px; padding-top: 2px;
+  }
+  .head h2 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+  .claim { margin: 0 0 18px 32px; color: var(--dim); max-width: var(--measure); }
+  .claim strong { color: var(--ink); font-weight: 600; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .panel + .panel { margin-top: 14px; }
+  .panel h3 {
+    margin: 0 0 3px; font-size: 14px; font-weight: 600;
+  }
+  .panel .sub { margin: 0 0 14px; color: var(--faint); font-size: 12.5px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 880px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+
+  /* ---- stat row ------------------------------------------------------- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .stat .v { font-size: 25px; font-weight: 640; letter-spacing: -0.02em; line-height: 1.1; }
+  .stat .k { color: var(--dim); font-size: 12.5px; margin-top: 5px; }
+  .stat .note { color: var(--faint); font-size: 11.5px; margin-top: 3px; }
+  .stat.good .v { color: var(--ok); }
+  .stat.bad .v { color: var(--bad); }
+  .stat.warn .v { color: var(--warn); }
+
+  /* ---- tables --------------------------------------------------------- */
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { padding: 7px 9px; text-align: right; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--faint); font-weight: 600; font-size: 11.5px; border-bottom-color: #2c3b55; }
+  tbody tr:hover { background: var(--raised); }
+  tr.spotlight td { background: rgba(57,135,229,.12); }
+  tr.spotlight td:first-child { box-shadow: inset 3px 0 0 var(--s1); font-weight: 600; }
+  td.best { color: var(--ok); font-weight: 600; }
+  .scroller { overflow-x: auto; }
+
+  /* ---- chart plumbing ------------------------------------------------- */
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 0 0 8px; font-size: 12px; color: var(--dim); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 11px; height: 3px; border-radius: 2px; display: inline-block; }
+  .swatch.dot { width: 9px; height: 9px; border-radius: 50%; }
+  svg { display: block; width: 100%; overflow: visible; }
+  svg text { fill: var(--faint); font-size: 10.5px; font-family: inherit; }
+  svg .axis-line { stroke: #2c3b55; stroke-width: 1; }
+  svg .grid-line { stroke: var(--grid); stroke-width: 1; }
+  svg .series { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  svg .fault-span { fill: rgba(255,93,93,.14); }
+  svg .wx-span { fill: rgba(245,184,61,.13); }
+  .tip {
+    position: fixed; z-index: 60; pointer-events: none; opacity: 0;
+    background: #0a1120; border: 1px solid #33456a; border-radius: 7px;
+    padding: 7px 10px; font-size: 12px; line-height: 1.5;
+    box-shadow: 0 8px 24px rgba(0,0,0,.55); max-width: 280px;
+    transition: opacity .1s;
+  }
+  .tip b { font-weight: 600; }
+  .tip .row { display: flex; justify-content: space-between; gap: 14px; }
+  .tip .row span:last-child { font-variant-numeric: tabular-nums; }
+
+  /* ---- controls ------------------------------------------------------- */
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .controls label { color: var(--faint); font-size: 12px; }
+  select, button.chip {
+    background: var(--raised); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 7px;
+    padding: 6px 11px; font: inherit; font-size: 12.5px; cursor: pointer;
+  }
+  button.chip[aria-pressed="true"] { border-color: var(--s1); color: #fff; background: rgba(57,135,229,.2); }
+  select:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--s1); outline-offset: 2px;
+  }
+
+  /* ---- case cards ----------------------------------------------------- */
+  .case { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .case header { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 9px; }
+  .case .cls { font-weight: 640; font-size: 14px; }
+  .case .verdict { margin: 9px 0 12px; color: var(--dim); font-size: 12.8px; }
+  .case .action { border-left: 2px solid var(--s2); padding-left: 11px; color: var(--ink); font-size: 12.8px; }
+  .tag {
+    font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 5px;
+    border: 1px solid var(--line); color: var(--dim); background: var(--raised);
+  }
+  .tag.ok { color: var(--ok); border-color: rgba(62,207,142,.35); }
+  .tag.warn { color: var(--warn); border-color: rgba(245,184,61,.35); }
+  .tag.bad { color: var(--bad); border-color: rgba(255,93,93,.35); }
+  .shap { display: grid; grid-template-columns: minmax(90px,1fr) 2.4fr auto; gap: 4px 10px; align-items: center; font-size: 12px; }
+  .shap .bar { display: block; height: 9px; background: var(--s1); border-radius: 4px; min-width: 2px; }
+  .shap .name { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .shap .val { color: var(--faint); font-size: 11.5px; }
+
+  .meter { height: 7px; background: #0d1626; border-radius: 4px; overflow: hidden; }
+  .meter i { display: block; height: 100%; border-radius: 4px; }
+
+  .empty { text-align: center; padding: 90px 20px; color: var(--dim); }
+  .empty code { display: inline-block; background: var(--panel); border: 1px solid var(--line);
+                border-radius: 6px; padding: 8px 14px; margin-top: 12px; color: var(--ink); font-size: 13px; }
+  .caveat { color: var(--faint); font-size: 12.5px; margin: 12px 0 0; max-width: var(--measure); }
+  ul.plain { margin: 0; padding-left: 18px; color: var(--dim); max-width: var(--measure); }
+  ul.plain li { margin-bottom: 7px; }
+  ul.plain b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="tip" id="tip" role="status" aria-live="polite"></div>
+<main class="wrap" id="root">
+  <div class="empty" id="missing" hidden>
+    <p>No benchmark results found next to this page.</p>
+    <code>python -m skyguard.eval.report</code>
+    <p style="margin-top:14px">That writes <code>dashboard/results.js</code>, then reload.</p>
+  </div>
+</main>
+
+<script src="results.js" onerror="window.__skyguardMissing=true"></script>
+<script>
+(function () {
+  "use strict";
+  const D = window.SKYGUARD_RESULTS;
+  const root = document.getElementById("root");
+  if (!D) { document.getElementById("missing").hidden = false; return; }
+
+  /* ------------------------------------------------------------------ */
+  /* small helpers                                                       */
+  /* ------------------------------------------------------------------ */
+  const NS = "http://www.w3.org/2000/svg";
+  const tip = document.getElementById("tip");
+  const el = (tag, attrs, kids) => {
+    const node = document.createElement(tag);
+    for (const k in (attrs || {})) {
+      if (k === "class") node.className = attrs[k];
+      else if (k === "html") node.innerHTML = attrs[k];
+      else if (k === "text") node.textContent = attrs[k];
+      else node.setAttribute(k, attrs[k]);
+    }
+    (kids || []).forEach(k => node.appendChild(k));
+    return node;
+  };
+  const s = (tag, attrs) => {
+    const node = document.createElementNS(NS, tag);
+    for (const k in (attrs || {})) node.setAttribute(k, attrs[k]);
+    return node;
+  };
+  const pct = v => (v === null || v === undefined || Number.isNaN(v)) ? "n/a" : (v * 100).toFixed(1) + "%";
+  const num = (v, d) => (v === null || v === undefined || Number.isNaN(v)) ? "n/a" : Number(v).toFixed(d === undefined ? 3 : d);
+  const clock = iso => iso ? iso.slice(0, 16).replace("T", " ") : "";
+  const titleCase = t => String(t).replace(/_/g, " ").replace(/^./, c => c.toUpperCase());
+
+  function showTip(evt, html) {
+    tip.innerHTML = html;
+    tip.style.opacity = "1";
+    const box = tip.getBoundingClientRect();
+    let x = evt.clientX + 14, y = evt.clientY + 14;
+    if (x + box.width > window.innerWidth - 8) x = evt.clientX - box.width - 14;
+    if (y + box.height > window.innerHeight - 8) y = evt.clientY - box.height - 14;
+    tip.style.left = x + "px";
+    tip.style.top = y + "px";
+  }
+  const hideTip = () => { tip.style.opacity = "0"; };
+  document.addEventListener("scroll", hideTip, true);
+
+  function section(n, title, claim) {
+    const wrap = el("section");
+    wrap.appendChild(el("div", { class: "head" }, [
+      el("span", { class: "n", text: n }),
+      el("h2", { text: title })
+    ]));
+    if (claim) wrap.appendChild(el("p", { class: "claim", html: claim }));
+    root.appendChild(wrap);
+    return wrap;
+  }
+  function panel(parent, title, sub) {
+    const p = el("div", { class: "panel" });
+    if (title) p.appendChild(el("h3", { text: title }));
+    if (sub) p.appendChild(el("p", { class: "sub", text: sub }));
+    parent.appendChild(p);
+    return p;
+  }
+  function legend(parent, items) {
+    parent.appendChild(el("div", { class: "legend" }, items.map(it =>
+      el("span", {}, [
+        el("i", { class: "swatch" + (it.dot ? " dot" : ""), style: "background:" + it.color }),
+        el("span", { text: it.label })
+      ])
+    )));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* line chart: shared by the hero trace, loss curve, ROC, PR, diurnal  */
+  /* ------------------------------------------------------------------ */
+  function lineChart(parent, opts) {
+    // The viewBox width sets the effective text size once the SVG is scaled to
+    // its column. A 1000-unit box inside a third-width panel shrinks 10.5px
+    // labels to about 3px, so narrow panels pass a narrower box.
+    const W = opts.width || 1000, H = opts.height || 220;
+    const M = Object.assign({ t: 12, r: 14, b: 26, l: 46 }, opts.margin || {});
+    const iw = W - M.l - M.r, ih = H - M.t - M.b;
+    const svg = s("svg", { viewBox: "0 0 " + W + " " + H, role: "img" });
+    svg.setAttribute("aria-label", opts.label || "chart");
+
+    const xs = opts.x;
+    const flat = [];
+    opts.series.forEach(ser => ser.y.forEach(v => { if (v !== null && Number.isFinite(v)) flat.push(v); }));
+    if (!flat.length) { parent.appendChild(el("p", { class: "sub", text: "No data for this chart." })); return; }
+    let y0 = opts.yMin !== undefined ? opts.yMin : Math.min.apply(null, flat);
+    let y1 = opts.yMax !== undefined ? opts.yMax : Math.max.apply(null, flat);
+    if (y1 - y0 < 1e-9) { y1 = y0 + 1; }
+    const padY = (y1 - y0) * 0.08;
+    if (opts.yMin === undefined) y0 -= padY;
+    if (opts.yMax === undefined) y1 += padY;
+    const x0 = opts.xMin !== undefined ? opts.xMin : Math.min.apply(null, xs);
+    const x1 = opts.xMax !== undefined ? opts.xMax : Math.max.apply(null, xs);
+
+    const X = v => M.l + (x1 === x0 ? 0 : (v - x0) / (x1 - x0)) * iw;
+    const Y = v => M.t + ih - ((v - y0) / (y1 - y0)) * ih;
+
+    (opts.spans || []).forEach(sp => {
+      svg.appendChild(s("rect", {
+        class: sp.kind === "weather" ? "wx-span" : "fault-span",
+        x: X(sp.from), y: M.t, width: Math.max(X(sp.to) - X(sp.from), 1.2), height: ih
+      }));
+    });
+
+    const ticks = 4;
+    for (let i = 0; i <= ticks; i++) {
+      const v = y0 + (y1 - y0) * i / ticks, yy = Y(v);
+      svg.appendChild(s("line", { class: "grid-line", x1: M.l, x2: M.l + iw, y1: yy, y2: yy }));
+      const t = s("text", { x: M.l - 7, y: yy + 3.5, "text-anchor": "end" });
+      t.textContent = opts.yFormat ? opts.yFormat(v) : v.toFixed(1);
+      svg.appendChild(t);
+    }
+    if (opts.rule !== undefined) {
+      svg.appendChild(s("line", {
+        class: "grid-line", x1: M.l, x2: M.l + iw, y1: Y(opts.rule), y2: Y(opts.rule),
+        stroke: "var(--warn)", "stroke-dasharray": "5 4", "stroke-width": 1.4
+      }));
+      const rl = s("text", { x: M.l + iw, y: Y(opts.rule) - 5, "text-anchor": "end", fill: "var(--warn)" });
+      rl.textContent = opts.ruleLabel || "";
+      svg.appendChild(rl);
+    }
+    svg.appendChild(s("line", { class: "axis-line", x1: M.l, x2: M.l + iw, y1: M.t + ih, y2: M.t + ih }));
+
+    (opts.xTicks || []).forEach(tk => {
+      const t = s("text", { x: X(tk.at), y: H - 8, "text-anchor": "middle" });
+      t.textContent = tk.label;
+      svg.appendChild(t);
+    });
+
+    opts.series.forEach(ser => {
+      let d = "", pen = false;
+      ser.y.forEach((v, i) => {
+        if (v === null || !Number.isFinite(v)) { pen = false; return; }
+        d += (pen ? "L" : "M") + X(xs[i]).toFixed(1) + " " + Y(v).toFixed(1) + " ";
+        pen = true;
+      });
+      if (ser.area) {
+        const fill = s("path", {
+          d: d + "L" + X(xs[xs.length - 1]) + " " + Y(y0) + " L" + X(xs[0]) + " " + Y(y0) + " Z",
+          fill: ser.color, opacity: 0.1, stroke: "none"
+        });
+        svg.appendChild(fill);
+      }
+      const path = s("path", {
+        class: "series", d: d, stroke: ser.color,
+        "stroke-width": ser.width || 2,
+        "stroke-dasharray": ser.dash || "none",
+        opacity: ser.opacity || 1
+      });
+      svg.appendChild(path);
+      if (opts.animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        const len = path.getTotalLength ? 4000 : 0;
+        if (len) {
+          path.style.strokeDasharray = ser.dash ? ser.dash : len;
+          path.style.strokeDashoffset = len;
+          path.style.transition = "stroke-dashoffset 1.1s ease-out";
+          requestAnimationFrame(() => { path.style.strokeDashoffset = "0"; });
+        }
+      }
+      (ser.marks || []).forEach(m => {
+        svg.appendChild(s("circle", {
+          cx: X(xs[m]), cy: Y(ser.y[m]), r: 3.4, fill: ser.markColor || "var(--bad)",
+          stroke: "var(--panel)", "stroke-width": 2
+        }));
+      });
+    });
+
+    // Crosshair + tooltip. An SVG chart on a page is interactive by default.
+    if (opts.hover) {
+      const cross = s("line", { class: "grid-line", y1: M.t, y2: M.t + ih, stroke: "#5d6f8c", opacity: 0 });
+      svg.appendChild(cross);
+      const hit = s("rect", { x: M.l, y: M.t, width: iw, height: ih, fill: "transparent" });
+      svg.appendChild(hit);
+      hit.addEventListener("pointermove", ev => {
+        const box = svg.getBoundingClientRect();
+        const px = (ev.clientX - box.left) / box.width * W;
+        let best = 0, bestD = Infinity;
+        xs.forEach((v, i) => { const d = Math.abs(X(v) - px); if (d < bestD) { bestD = d; best = i; } });
+        cross.setAttribute("x1", X(xs[best]));
+        cross.setAttribute("x2", X(xs[best]));
+        cross.setAttribute("opacity", "0.6");
+        showTip(ev, opts.hover(best));
+      });
+      hit.addEventListener("pointerleave", () => { cross.setAttribute("opacity", 0); hideTip(); });
+    }
+    parent.appendChild(svg);
+    return svg;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* horizontal bars                                                     */
+  /* ------------------------------------------------------------------ */
+  function barChart(parent, rows, opts) {
+    opts = opts || {};
+    const max = opts.max !== undefined ? opts.max : Math.max.apply(null, rows.map(r => Math.abs(r.value)).concat([1e-9]));
+    const rowH = opts.rowH || 26, labelW = opts.labelW || 190;
+    const W = 1000, H = rows.length * rowH + 8;
+    const svg = s("svg", { viewBox: "0 0 " + W + " " + H, role: "img" });
+    svg.setAttribute("aria-label", opts.label || "bar chart");
+    const barX = labelW + 8, barW = W - barX - 62;
+    rows.forEach((r, i) => {
+      const y = i * rowH + 4;
+      const t = s("text", { x: labelW, y: y + rowH / 2 + 3.5, "text-anchor": "end" });
+      t.textContent = r.label;
+      if (r.emphasis) t.setAttribute("fill", "var(--ink)");
+      svg.appendChild(t);
+      const pair = r.value2 !== undefined;
+      // A 2px surface gap between the two bars in a pair, so they read as two
+      // marks rather than one block.
+      const barH = pair ? (rowH - 12) / 2 : rowH - 10;
+      const draw = (value, offset, color) => {
+        const w = Math.max((Math.abs(value) / max) * barW, 2);
+        const rect = s("rect", {
+          x: barX, y: y + 4 + offset, width: w, height: barH, rx: Math.min(4, barH / 2),
+          fill: color, opacity: r.faded ? 0.45 : 1
+        });
+        svg.appendChild(rect);
+        if (r.tip) {
+          rect.addEventListener("pointerenter", ev => showTip(ev, r.tip));
+          rect.addEventListener("pointermove", ev => showTip(ev, r.tip));
+          rect.addEventListener("pointerleave", hideTip);
+        }
+        return w;
+      };
+      const w1 = draw(r.value, 0, r.color || "var(--s1)");
+      let widest = w1;
+      if (pair) widest = Math.max(w1, draw(r.value2, barH + 2, r.color2 || "var(--s3)"));
+      const v = s("text", { x: barX + widest + 8, y: y + rowH / 2 + 3.5, fill: "var(--dim)" });
+      v.textContent = r.display !== undefined ? r.display : num(r.value);
+      svg.appendChild(v);
+    });
+    parent.appendChild(svg);
+  }
+
+  /* ================================================================== */
+  /* 0. run stamp                                                        */
+  /* ================================================================== */
+  const M = D.meta;
+  const stamp = el("div", { class: "stamp" });
+  const inner = el("div", { class: "wrap", style: "padding-bottom:0" });
+  inner.appendChild(el("div", {
+    class: "provenance",
+    html: "<b>Real observations.</b> " + M.source_label
+  }));
+  inner.appendChild(el("h1", { text: "What SkyGuard's models learned, and how well they hold up" }));
+  inner.appendChild(el("p", {
+    class: "lede",
+    text: "One benchmark run, start to finish: the autoencoder trained on clean weather only, "
+        + "thresholds calibrated per station, faults injected with known labels, then a held-out "
+        + "split streamed through all six layers. Every number below comes from that run."
+  }));
+  const facts = el("dl", { class: "facts" });
+  const factRows = [
+    ["Generated", clock(M.generated_at) + " UTC"],
+    ["Stations", String(M.n_stations)],
+    ["Observations scored", M.test_observations.toLocaleString()],
+    ["Sampling", M.interval_minutes + " min"],
+    ["Split (train / val / test)", (M.split.train[1] - M.split.train[0]) + " / "
+      + (M.split.val[1] - M.split.val[0]) + " / " + (M.split.test[1] - M.split.test[0]) + " steps"],
+    ["Seed", String(M.seed)],
+    ["Runtime", M.total_seconds + " s"],
+    ["Environment", "Python " + M.python + ", numpy " + M.numpy]
+  ];
+  factRows.forEach(([k, v]) => facts.appendChild(el("div", {}, [
+    el("dt", { text: k }), el("dd", { class: "mono", text: v })
+  ])));
+  inner.appendChild(facts);
+  stamp.appendChild(inner);
+  document.body.insertBefore(stamp, root);
+
+  /* ================================================================== */
+  /* 1. hero: the model reconstructing real weather                      */
+  /* ================================================================== */
+  const s1 = section("1", "The model reconstructing weather it has never seen",
+    "The blue trace is what the station reported. The orange trace is what the autoencoder expected "
+    + "from the preceding hours alone. Where they separate, something happened. Red bands are injected "
+    + "faults with known ground truth; amber bands are real extreme weather that must <strong>not</strong> be flagged.");
+  const heroPanel = panel(s1);
+  const controls = el("div", { class: "controls" });
+  controls.appendChild(el("label", { text: "Station", for: "station-pick" }));
+  const pick = el("select", { id: "station-pick" });
+  D.timelines.forEach((tl, i) => {
+    const meta = D.stations.find(st => st.station_id === tl.station_id) || {};
+    pick.appendChild(el("option", { value: String(i), text: (meta.name || tl.station_id)
+      + (meta.elevation_m !== undefined ? "  (" + Math.round(meta.elevation_m) + " m, " + meta.terrain + ")" : "") }));
+  });
+  controls.appendChild(pick);
+  const varButtons = el("div", { class: "controls", style: "margin:0" });
+  const VARS = [
+    { key: "temp_c", recon: "temp_recon", label: "Temperature", unit: " C" },
+    { key: "pressure_hpa", recon: "pressure_recon", label: "Pressure", unit: " hPa" },
+    { key: "rh_pct", recon: "rh_recon", label: "Humidity", unit: "%" }
+  ];
+  let activeVar = 0;
+  VARS.forEach((v, i) => {
+    const b = el("button", { class: "chip", type: "button", text: v.label });
+    b.setAttribute("aria-pressed", String(i === 0));
+    b.addEventListener("click", () => {
+      activeVar = i;
+      [...varButtons.children].forEach((c, j) => c.setAttribute("aria-pressed", String(j === i)));
+      drawHero();
+    });
+    varButtons.appendChild(b);
+  });
+  controls.appendChild(varButtons);
+  heroPanel.appendChild(controls);
+  const heroBody = el("div");
+  heroPanel.appendChild(heroBody);
+  pick.addEventListener("change", drawHero);
+
+  function spansOf(tl) {
+    const out = [];
+    let start = null, kind = null;
+    tl.true_class.forEach((c, i) => {
+      const k = c === "none" ? null : (c === "genuine_extreme" ? "weather" : "fault");
+      if (k !== kind) {
+        if (kind) out.push({ from: start, to: i, kind: kind });
+        kind = k; start = i;
+      }
+    });
+    if (kind) out.push({ from: start, to: tl.true_class.length, kind: kind });
+    return out;
+  }
+
+  function drawHero() {
+    heroBody.innerHTML = "";
+    const tl = D.timelines[Number(pick.value)];
+    const v = VARS[activeVar];
+    const idx = tl.timestamps.map((_, i) => i);
+    const spans = spansOf(tl);
+    const xTicks = [];
+    const stepTick = Math.max(1, Math.floor(tl.timestamps.length / 7));
+    for (let i = 0; i < tl.timestamps.length; i += stepTick) {
+      xTicks.push({ at: i, label: tl.timestamps[i].slice(5, 10) });
+    }
+    legend(heroBody, [
+      { color: "var(--s1)", label: "Reported by the station" },
+      { color: "var(--s2)", label: "Reconstructed by the autoencoder" },
+      { color: "rgba(255,93,93,.5)", label: "Injected fault (ground truth)", dot: true },
+      { color: "rgba(245,184,61,.5)", label: "Real extreme weather", dot: true }
+    ]);
+    lineChart(heroBody, {
+      height: 250, x: idx, xTicks: xTicks, spans: spans, hover: hoverAt, animate: true,
+      label: v.label + " reported against reconstructed at " + tl.station_id,
+      series: [
+        { y: tl[v.key], color: "var(--s1)", width: 1.8 },
+        { y: tl[v.recon], color: "var(--s2)", width: 1.8, opacity: 0.95 }
+      ],
+      yFormat: n => n.toFixed(1)
+    });
+    heroBody.appendChild(el("p", { class: "sub", style: "margin:14px 0 2px",
+      text: "Fused anomaly probability, all six layers, with the 0.50 decision line" }));
+    legend(heroBody, [
+      { color: "var(--s3)", label: "P(anomaly)" },
+      { color: "var(--warn)", label: "Decision threshold 0.50" }
+    ]);
+    lineChart(heroBody, {
+      height: 130, x: idx, xTicks: xTicks, spans: spans, hover: hoverAt,
+      yMin: 0, yMax: 1, rule: 0.5, ruleLabel: "flag above 0.50",
+      label: "Fused anomaly probability at " + tl.station_id,
+      series: [{ y: tl.probability, color: "var(--s3)", width: 1.7, area: true }],
+      yFormat: n => n.toFixed(1)
+    });
+
+    function hoverAt(i) {
+      const cls = tl.true_class[i];
+      const verdict = tl.predicted[i] ? "flagged" : "passed";
+      const truthText = cls === "none" ? "normal" : (cls === "genuine_extreme" ? "real weather" : cls);
+      let colour = "var(--dim)";
+      if (cls !== "none" && cls !== "genuine_extreme") colour = tl.predicted[i] ? "var(--ok)" : "var(--bad)";
+      else if (tl.predicted[i]) colour = "var(--bad)";
+      else colour = "var(--ok)";
+      return "<b>" + tl.timestamps[i].slice(0, 16).replace("T", " ") + "</b>"
+        + "<div class='row'><span>Reported</span><span>" + num(tl[v.key][i], 1) + v.unit + "</span></div>"
+        + "<div class='row'><span>Reconstructed</span><span>"
+        + (tl[v.recon][i] === null ? "warming up" : num(tl[v.recon][i], 1) + v.unit) + "</span></div>"
+        + "<div class='row'><span>P(anomaly)</span><span>" + num(tl.probability[i], 2) + "</span></div>"
+        + "<div class='row'><span>Truth</span><span>" + truthText + "</span></div>"
+        + "<div class='row'><span>Verdict</span><span style='color:" + colour + "'>" + verdict
+        + " (" + tl.status[i] + ")</span></div>"
+        + (tl.damped[i] ? "<div style='color:var(--warn);margin-top:4px'>Genuine-weather guard damped this alarm</div>" : "");
+    }
+  }
+  drawHero();
+
+  /* ================================================================== */
+  /* 2. training                                                         */
+  /* ================================================================== */
+  const T = D.training;
+  const s2 = section("2", "What training actually did",
+    "The autoencoder never sees a fault during training. It is fitted on clean observations only, "
+    + "stopped on a held-out clean split, and its hand-written gradients are checked against finite differences "
+    + "before any of it is believed.");
+  const g2 = el("div", { class: "grid2" });
+  s2.appendChild(g2);
+
+  const lossPanel = panel(g2, "Reconstruction loss per epoch",
+    "Early stopping keeps the parameters from the best validation epoch, not the last one.");
+  legend(lossPanel, [
+    { color: "var(--s1)", label: "Training loss" },
+    { color: "var(--s2)", label: "Validation loss (clean, held out)" }
+  ]);
+  const epochs = T.train_loss.map((_, i) => i + 1);
+  const bestEpoch = T.val_loss.indexOf(Math.min.apply(null, T.val_loss));
+  lineChart(lossPanel, {
+    height: 200, x: epochs, label: "Training and validation loss per epoch",
+    xTicks: epochs.filter((e, i) => i % Math.max(1, Math.round(epochs.length / 6)) === 0).map(e => ({ at: e, label: String(e) })),
+    series: [
+      { y: T.train_loss, color: "var(--s1)" },
+      { y: T.val_loss, color: "var(--s2)", marks: [bestEpoch], markColor: "var(--s2)" }
+    ],
+    yFormat: n => n.toFixed(3),
+    hover: i => "<b>Epoch " + epochs[i] + "</b>"
+      + "<div class='row'><span>Train</span><span>" + num(T.train_loss[i], 5) + "</span></div>"
+      + "<div class='row'><span>Validation</span><span>" + num(T.val_loss[i], 5) + "</span></div>"
+      + (i === bestEpoch ? "<div style='color:var(--s2);margin-top:4px'>Best epoch, parameters kept from here</div>" : "")
+  });
+
+  const factPanel = panel(g2, "Model and gate", "Geometry, cost, and the check that makes the gradients trustworthy.");
+  const gc = T.gradcheck;
+  const trainStats = el("div", { class: "stats" });
+  [
+    { v: T.epochs_run + " / " + T.config.max_epochs, k: "Epochs run before early stop" },
+    { v: num(T.best_val_loss, 5), k: "Best validation loss", note: "mean squared error, standardised units" },
+    { v: T.parameters.toLocaleString(), k: "Trainable parameters", note: T.config.window + "-step window, " + T.config.hidden_size + " hidden units" },
+    { v: T.n_train_windows.toLocaleString(), k: "Training windows", note: T.n_val_windows.toLocaleString() + " validation windows" },
+    { v: T.train_seconds + " s", k: "Training time", note: "single CPU core, numpy only" },
+    { v: gc.passed ? "Passed" : "FAILED", k: "Finite-difference gradient check",
+      note: "worst relative error " + gc.max_relative_error.toExponential(1) + " against tolerance " + gc.tolerance.toExponential(0),
+      cls: gc.passed ? "good" : "bad" }
+  ].forEach(st => {
+    trainStats.appendChild(el("div", { class: "stat " + (st.cls || "") }, [
+      el("div", { class: "v", text: st.v }),
+      el("div", { class: "k", text: st.k }),
+      st.note ? el("div", { class: "note", text: st.note }) : el("span")
+    ]));
+  });
+  factPanel.appendChild(trainStats);
+
+  const diur = D.learned.diurnal;
+  if (diur.hour.length) {
+    const dp = panel(s2, "The daily cycle the model learned",
+      "Mean temperature by hour of day across the test split, clean observations only. A model that had learned "
+      + "only the average would reconstruct a flat line here.");
+    legend(dp, [
+      { color: "var(--s1)", label: "Observed" },
+      { color: "var(--s2)", label: "Reconstructed" }
+    ]);
+    lineChart(dp, {
+      height: 190, x: diur.hour, label: "Observed against reconstructed temperature by hour of day",
+      xTicks: diur.hour.filter(h => h % 3 === 0).map(h => ({ at: h, label: String(h).padStart(2, "0") + ":00" })),
+      series: [
+        { y: diur.observed, color: "var(--s1)" },
+        { y: diur.reconstructed, color: "var(--s2)", dash: "6 4" }
+      ],
+      yFormat: n => n.toFixed(1) + " C",
+      hover: i => "<b>" + String(diur.hour[i]).padStart(2, "0") + ":00 UTC</b>"
+        + "<div class='row'><span>Observed</span><span>" + num(diur.observed[i], 2) + " C</span></div>"
+        + "<div class='row'><span>Reconstructed</span><span>" + num(diur.reconstructed[i], 2) + " C</span></div>"
+        + "<div class='row'><span>Points</span><span>" + diur.n[i] + "</span></div>"
+    });
+    const err = D.learned.reconstruction_error_by_variable;
+    dp.appendChild(el("p", { class: "caveat", text:
+      "Mean reconstruction error on clean points, by channel: temperature " + num(err.temp_c, 4)
+      + ", pressure " + num(err.pressure_hpa, 4) + ", humidity " + num(err.rh_pct, 4)
+      + ". These per-channel errors are the autoencoder's own explanation of which sensor looks wrong." }));
+  }
+
+  /* ================================================================== */
+  /* 3. detection scorecard                                              */
+  /* ================================================================== */
+  const H = D.hybrid;
+  const s3 = section("3", "How well the full stack detects",
+    "Accuracy is not the headline here and never should be: on data that is "
+    + pct(1 - D.injection.anomaly_rate) + " normal, a detector that says \"all fine\" scores "
+    + pct(1 - D.injection.anomaly_rate) + ". These are the numbers an operator actually feels.");
+  const cards = el("div", { class: "stats" });
+  const wxFar = H.genuine_extreme_far;
+  [
+    { v: pct(H.point.precision), k: "Precision", note: "of everything flagged, this much was really a fault", cls: H.point.precision >= 0.8 ? "good" : "" },
+    { v: pct(H.point.recall), k: "Point recall", note: "of all faulty observations, this many were caught" },
+    { v: pct(H.event_recall), k: "Event recall", note: H.n_spans + " fault spans, caught if any point inside fires", cls: H.event_recall >= 0.8 ? "good" : "" },
+    { v: pct(H.point.false_alarm_rate), k: "False-alarm rate", note: "share of normal observations wrongly flagged", cls: H.point.false_alarm_rate <= 0.05 ? "good" : "bad" },
+    { v: pct(wxFar), k: "Real weather flagged as a fault", note: D.injection.genuine_extreme_points + " genuine extreme points in the test split", cls: wxFar <= 0.05 ? "good" : (wxFar <= 0.2 ? "warn" : "bad") },
+    { v: H.mean_detection_delay === null ? "n/a" : H.mean_detection_delay + " steps", k: "Mean detection delay", note: "intervals from fault onset to the first alarm" },
+    { v: num(H.roc.auc, 3), k: "ROC AUC", note: "ranking quality, independent of where the cut sits" },
+    { v: num(H.pr.average_precision, 3), k: "Average precision", note: "random guessing would score " + num(H.pr.baseline, 3) }
+  ].forEach(c => {
+    cards.appendChild(el("div", { class: "stat " + (c.cls || "") }, [
+      el("div", { class: "v", text: c.v }),
+      el("div", { class: "k", text: c.k }),
+      el("div", { class: "note", text: c.note })
+    ]));
+  });
+  s3.appendChild(cards);
+
+  const OP = D.operational;
+  const tierPanel = panel(s3, "The pipeline has two answers, so here are both",
+    OP ? OP.definition : "");
+  if (OP) {
+    const tierTable = el("table");
+    const th = el("tr");
+    ["Question the tier answers", "Precision", "Recall", "F1", "False alarms",
+     "Event recall", "Real weather flagged"].forEach(t => th.appendChild(el("th", { text: t })));
+    tierTable.appendChild(el("thead", {}, [th]));
+    const tb = el("tbody");
+    [
+      { label: "Hold this record back for review",
+        sub: "any QC status other than PASS",
+        p: OP.point, ev: OP.event_recall, wx: OP.genuine_extreme_far },
+      { label: "Quarantine or replace this reading",
+        sub: "fused probability at or above 0.50",
+        p: H.point, ev: H.event_recall, wx: H.genuine_extreme_far }
+    ].forEach(t => {
+      const tr = el("tr");
+      tr.appendChild(el("td", {}, [
+        el("div", { text: t.label }),
+        el("div", { style: "color:var(--faint);font-size:11.5px", text: t.sub })
+      ]));
+      [pct(t.p.precision), pct(t.p.recall), num(t.p.f1, 3), pct(t.p.false_alarm_rate),
+       pct(t.ev), pct(t.wx)].forEach(v => tr.appendChild(el("td", { text: v })));
+      tb.appendChild(tr);
+    });
+    tierTable.appendChild(tb);
+    const tsc = el("div", { class: "scroller" });
+    tsc.appendChild(tierTable);
+    tierPanel.appendChild(tsc);
+    tierPanel.appendChild(el("p", { class: "caveat", text:
+      "That gap is the trade every operational QC system makes. Reviewing anything suspicious catches "
+      + pct(OP.point.recall) + " of faulty observations but sends " + pct(OP.genuine_extreme_far)
+      + " of real heatwave readings to a human. Quarantining only what the layers agree on almost never "
+      + "touches real weather (" + pct(H.genuine_extreme_far) + ") and convicts " + pct(H.point.recall)
+      + ". Both are correct answers to different questions, and the system reports both rather than "
+      + "picking one and calling it accuracy." }));
+  }
+
+  const perClass = H.per_class_recall;
+  const classPanel = panel(s3, "Recall by fault class",
+    "One aggregate recall would hide that a spike is easy and a slow drift is nearly invisible to a windowed model.");
+  legend(classPanel, [
+    { color: "var(--s1)", label: "Held back for review" },
+    { color: "var(--s3)", label: "Quarantined outright" }
+  ]);
+  const opClass = OP ? OP.per_class_recall : {};
+  barChart(classPanel, Object.keys(perClass)
+    .sort((a, b) => (opClass[b] || 0) - (opClass[a] || 0))
+    .map(k => ({
+      label: titleCase(k),
+      value: opClass[k] !== undefined ? opClass[k] : perClass[k],
+      value2: perClass[k],
+      display: pct(opClass[k] !== undefined ? opClass[k] : perClass[k]),
+      tip: "<b>" + titleCase(k) + "</b>"
+         + "<div class='row'><span>Held for review</span><span>" + pct(opClass[k]) + "</span></div>"
+         + "<div class='row'><span>Quarantined</span><span>" + pct(perClass[k]) + "</span></div>"
+         + "<div class='row'><span>Points injected</span><span>" + (D.injection.by_class[k] || 0) + "</span></div>"
+    })), { max: 1, rowH: 30, label: "Recall by fault class at both decision tiers" });
+
+  /* ================================================================== */
+  /* 4. ablation ladder                                                  */
+  /* ================================================================== */
+  const s4 = section("4", "What each layer is worth",
+    "Same data, same seed, same injected faults. Only the detector changes. The point is not that the last row "
+    + "wins everything, it is to show what each layer buys and where it costs something.");
+  const abPanel = panel(s4, null, null);
+  const table = el("table");
+  const cols = [
+    ["name", "Detector"], ["f1", "F1"], ["precision", "Precision"], ["recall", "Recall"],
+    ["false_alarm_rate", "False alarms"], ["event_recall", "Event recall"],
+    ["genuine_extreme_far", "Real weather flagged"], ["roc_auc", "ROC AUC"], ["ece", "Calibration error"]
+  ];
+  const thead = el("thead");
+  const hrow = el("tr");
+  cols.forEach(([, label]) => hrow.appendChild(el("th", { text: label })));
+  thead.appendChild(hrow);
+  table.appendChild(thead);
+  const best = {};
+  ["f1", "precision", "recall", "event_recall", "roc_auc"].forEach(k => best[k] = Math.max.apply(null, D.ablation.map(r => r[k])));
+  ["false_alarm_rate", "genuine_extreme_far", "ece"].forEach(k => best[k] = Math.min.apply(null, D.ablation.map(r => r[k])));
+  const tbody = el("tbody");
+  D.ablation.forEach(row => {
+    const tr = el("tr");
+    if (row.note === "SkyGuard layer" || row.name.indexOf("Full hybrid") === 0) tr.className = "spotlight";
+    cols.forEach(([key]) => {
+      if (key === "name") {
+        tr.appendChild(el("td", {}, [
+          el("div", { text: row.name }),
+          el("div", { class: "note", style: "color:var(--faint);font-size:11.5px", text: row.note })
+        ]));
+      } else {
+        const isRate = key !== "roc_auc" && key !== "ece";
+        const td = el("td", { text: isRate ? pct(row[key]) : num(row[key], 3) });
+        if (Math.abs(row[key] - best[key]) < 1e-9) td.className = "best";
+        tr.appendChild(td);
+      }
+    });
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  const scroller = el("div", { class: "scroller" });
+  scroller.appendChild(table);
+  abPanel.appendChild(scroller);
+  abPanel.appendChild(el("p", { class: "caveat", text:
+    "Green marks the best value in each column. The SkyGuard rows are computed by streaming the test split once "
+    + "and re-fusing the captured layer evidence with layers muted, which is identical to running each "
+    + "configuration separately because fusion is a pure function of the four layer outputs." }));
+
+  const rankPanel = panel(s4, "Ranking quality across the ladder",
+    "ROC AUC asks whether the detector orders faults above normal air, whatever threshold you later choose.");
+  barChart(rankPanel, D.ablation.map(r => ({
+    label: r.name, value: r.roc_auc, display: num(r.roc_auc, 3),
+    emphasis: r.note === "SkyGuard layer" || r.name.indexOf("Full hybrid") === 0,
+    color: (r.note === "SkyGuard layer" || r.name.indexOf("Full hybrid") === 0) ? "var(--s1)" : "var(--s3)",
+    faded: !(r.note === "SkyGuard layer" || r.name.indexOf("Full hybrid") === 0),
+    tip: "<b>" + r.name + "</b><div class='row'><span>ROC AUC</span><span>" + num(r.roc_auc, 3) + "</span></div>"
+       + "<div class='row'><span>Average precision</span><span>" + num(r.average_precision, 3) + "</span></div>"
+  })), { max: 1, labelW: 230, label: "ROC AUC by detector" });
+
+  /* ================================================================== */
+  /* 5. ranking and separation                                           */
+  /* ================================================================== */
+  const s5 = section("5", "Where the decision boundary sits",
+    "A single threshold is one point on these curves. Seeing the whole curve is what tells you whether the "
+    + "operating point can be moved without the system falling apart.");
+  const g5 = el("div", { class: "grid3" });
+  s5.appendChild(g5);
+
+  const rocPanel = panel(g5, "ROC curve", "Area " + num(H.roc.auc, 3) + ". The diagonal is guessing.");
+  lineChart(rocPanel, {
+    width: 360, height: 250, margin: { t: 10, r: 12, b: 26, l: 34 },
+    x: H.roc.fpr, xMin: 0, xMax: 1, yMin: 0, yMax: 1,
+    label: "Receiver operating characteristic",
+    xTicks: [0, 0.5, 1].map(v => ({ at: v, label: v.toFixed(1) })),
+    series: [
+      { y: H.roc.fpr, color: "var(--faint)", dash: "4 4", width: 1.2 },
+      { y: H.roc.tpr, color: "var(--s1)", area: true }
+    ],
+    yFormat: n => n.toFixed(1)
+  });
+  rocPanel.appendChild(el("p", { class: "sub", style: "margin:8px 0 0", text: "False-positive rate along the bottom, true-positive rate up the side." }));
+
+  const prPanel = panel(g5, "Precision and recall",
+    "Average precision " + num(H.pr.average_precision, 3) + " against a " + num(H.pr.baseline, 3) + " random baseline.");
+  lineChart(prPanel, {
+    width: 360, height: 250, margin: { t: 10, r: 12, b: 26, l: 34 },
+    x: H.pr.recall, xMin: 0, xMax: 1, yMin: 0, yMax: 1,
+    label: "Precision against recall",
+    xTicks: [0, 0.5, 1].map(v => ({ at: v, label: v.toFixed(1) })),
+    series: [
+      { y: H.pr.recall.map(() => H.pr.baseline), color: "var(--faint)", dash: "4 4", width: 1.2 },
+      { y: H.pr.precision, color: "var(--s2)", area: true }
+    ],
+    yFormat: n => n.toFixed(1)
+  });
+  prPanel.appendChild(el("p", { class: "sub", style: "margin:8px 0 0", text: "Recall along the bottom, precision up the side." }));
+
+  const sep = H.score_histogram;
+  const sepPanel = panel(g5, "Score separation",
+    "Where the two distributions overlap, no threshold can separate them.");
+  const sepMid = sep.edges.slice(0, -1).map((e, i) => (e + sep.edges[i + 1]) / 2);
+  legend(sepPanel, [
+    { color: "var(--s3)", label: "Normal" },
+    { color: "var(--bad)", label: "Faulty" }
+  ]);
+  const maxCount = Math.max.apply(null, sep.normal.concat(sep.anomalous));
+  lineChart(sepPanel, {
+    width: 360, height: 220, margin: { t: 10, r: 12, b: 26, l: 42 },
+    x: sepMid, xMin: 0, xMax: 1, yMin: 0, yMax: maxCount, rule: undefined,
+    label: "Distribution of anomaly scores by ground truth",
+    xTicks: [0, 0.5, 1].map(v => ({ at: v, label: v.toFixed(1) })),
+    series: [
+      { y: sep.normal, color: "var(--s3)", area: true },
+      { y: sep.anomalous, color: "var(--bad)", area: true }
+    ],
+    yFormat: n => n >= 1000 ? (n / 1000).toFixed(0) + "k" : n.toFixed(0),
+    hover: i => "<b>Score near " + num(sepMid[i], 2) + "</b>"
+      + "<div class='row'><span>Normal points</span><span>" + sep.normal[i] + "</span></div>"
+      + "<div class='row'><span>Faulty points</span><span>" + sep.anomalous[i] + "</span></div>"
+  });
+
+  const cal = H.calibration;
+  if (cal.bins && cal.bins.length) {
+    const calPanel = panel(s5, "Is the confidence score honest?",
+      "Expected calibration error " + num(cal.ece, 4) + ". On the diagonal, observations reported at 90% confidence "
+      + "turn out faulty about 90% of the time.");
+    legend(calPanel, [
+      { color: "var(--s1)", label: "Observed fault rate in each confidence bin" },
+      { color: "var(--faint)", label: "Perfect calibration" }
+    ]);
+    lineChart(calPanel, {
+      height: 210, x: cal.bins.map(b => b.mean_prob), xMin: 0, xMax: 1, yMin: 0, yMax: 1,
+      label: "Reliability curve",
+      xTicks: [0, 0.25, 0.5, 0.75, 1].map(v => ({ at: v, label: v.toFixed(2) })),
+      series: [
+        { y: cal.bins.map(b => b.mean_prob), color: "var(--faint)", dash: "4 4", width: 1.2 },
+        { y: cal.bins.map(b => b.mean_truth), color: "var(--s1)", marks: cal.bins.map((_, i) => i), markColor: "var(--s1)" }
+      ],
+      yFormat: n => n.toFixed(2),
+      hover: i => "<b>Confidence bin " + num(cal.bins[i].bin_mid, 2) + "</b>"
+        + "<div class='row'><span>Mean stated confidence</span><span>" + num(cal.bins[i].mean_prob, 3) + "</span></div>"
+        + "<div class='row'><span>Actually faulty</span><span>" + pct(cal.bins[i].mean_truth) + "</span></div>"
+        + "<div class='row'><span>Observations</span><span>" + cal.bins[i].n + "</span></div>"
+    });
+    calPanel.appendChild(el("p", { class: "sub", style: "margin:8px 0 0",
+      text: "Stated confidence along the bottom, measured fault rate up the side." }));
+  }
+
+  /* ================================================================== */
+  /* 6. root cause                                                       */
+  /* ================================================================== */
+  const cm = H.confusion;
+  const s6 = section("6", "Naming the fault, not just spotting it",
+    "Detection says something is wrong. The Layer 6 forest says what kind of wrong, which is the difference "
+    + "between an alert an engineer can act on and one they have to investigate from scratch.");
+  const cmPanel = panel(s6, "Fault-class confusion on detected observations",
+    "Rows are the injected truth, columns are what the classifier called it. " + cm.n
+    + " detected observations, " + pct(cm.accuracy) + " named correctly.");
+  if (cm.labels.length) {
+    const rowTotals = cm.matrix.map(r => r.reduce((a, b) => a + b, 0));
+    const cmTable = el("table");
+    const ch = el("tr");
+    ch.appendChild(el("th", { text: "Injected \\ called" }));
+    cm.labels.forEach(l => ch.appendChild(el("th", { text: titleCase(l) })));
+    ch.appendChild(el("th", { text: "Recall" }));
+    cmTable.appendChild(el("thead", {}, [ch]));
+    const cb = el("tbody");
+    cm.matrix.forEach((row, r) => {
+      const tr = el("tr");
+      tr.appendChild(el("td", { text: titleCase(cm.labels[r]) }));
+      row.forEach((cell, c) => {
+        const share = rowTotals[r] ? cell / rowTotals[r] : 0;
+        const td = el("td", { text: cell ? String(cell) : "" });
+        if (cell) {
+          // Sequential magnitude, one hue, light to dark. The diagonal is the
+          // same hue, so a strong diagonal reads as a strong band, not a colour change.
+          td.style.background = "rgba(57,135,229," + (0.08 + share * 0.55).toFixed(3) + ")";
+          td.style.color = share > 0.5 ? "#fff" : "var(--ink)";
+        }
+        td.title = titleCase(cm.labels[r]) + " called " + titleCase(cm.labels[c]) + ": " + cell;
+        tr.appendChild(td);
+      });
+      tr.appendChild(el("td", { text: rowTotals[r] ? pct(cm.matrix[r][r] / rowTotals[r]) : "n/a" }));
+      cb.appendChild(tr);
+    });
+    cmTable.appendChild(cb);
+    const sc = el("div", { class: "scroller" });
+    sc.appendChild(cmTable);
+    cmPanel.appendChild(sc);
+  } else {
+    cmPanel.appendChild(el("p", { class: "sub", text: "No detected faults to classify in this run." }));
+  }
+
+  /* ================================================================== */
+  /* 7. worked explanations                                              */
+  /* ================================================================== */
+  if (D.cases && D.cases.length) {
+    const s7 = section("7", "The system explaining itself",
+      "The strongest example the run produced for each fault class, with the evidence that convicted it. "
+      + "Explainability a meteorologist cannot read is not explainability.");
+    const g7 = el("div", { class: "grid2" });
+    s7.appendChild(g7);
+    D.cases.forEach(c => {
+      const card = el("div", { class: "case" });
+      const isWeather = c.true_class === "genuine_extreme";
+      const correct = isWeather ? true : c.predicted_class === c.true_class;
+      card.appendChild(el("header", {}, [
+        el("span", { class: "cls", text: isWeather ? "Real extreme weather" : titleCase(c.true_class) }),
+        el("span", { class: "tag " + (isWeather ? "ok" : (correct ? "ok" : "warn")),
+          text: isWeather ? "correctly not flagged" : ("called " + titleCase(c.predicted_class)) }),
+        el("span", { class: "tag " + (c.severity === "critical" || c.severity === "high" ? "bad" : ""), text: c.severity }),
+        el("span", { class: "tag", text: c.station_id })
+      ]));
+      card.appendChild(el("div", { class: "sub", style: "margin:0",
+        text: clock(c.timestamp) + " UTC  |  " + num(c.values.temp_c, 1) + " C, "
+            + num(c.values.pressure_hpa, 1) + " hPa, " + num(c.values.rh_pct, 0) + "% RH" }));
+      card.appendChild(el("div", { class: "verdict", text: c.explanation || "No narrative produced." }));
+
+      const ev = Object.keys(c.layer_evidence).filter(k => c.layer_evidence[k] > 0);
+      if (ev.length) {
+        card.appendChild(el("p", { class: "sub", style: "margin:0 0 6px", text: "Layer evidence going into fusion" }));
+        const evMax = Math.max.apply(null, ev.map(k => c.layer_evidence[k]));
+        const shap = el("div", { class: "shap" });
+        ev.sort((a, b) => c.layer_evidence[b] - c.layer_evidence[a]).forEach(k => {
+          shap.appendChild(el("div", { class: "name", text: titleCase(k) }));
+          shap.appendChild(el("div", {}, [el("i", { class: "bar",
+            style: "width:" + Math.max(2, (c.layer_evidence[k] / evMax) * 100) + "%;background:var(--s1)" })]));
+          shap.appendChild(el("div", { class: "val", text: num(c.layer_evidence[k], 2) }));
+        });
+        card.appendChild(shap);
+      }
+      if (c.shapley && c.shapley.length) {
+        card.appendChild(el("p", { class: "sub", style: "margin:12px 0 6px", text: "Shapley attribution over the fault classifier" }));
+        const sMax = Math.max.apply(null, c.shapley.map(x => Math.abs(x.contribution)).concat([1e-9]));
+        const shap2 = el("div", { class: "shap" });
+        c.shapley.slice(0, 5).forEach(x => {
+          shap2.appendChild(el("div", { class: "name", text: x.feature, title: x.detail || x.feature }));
+          shap2.appendChild(el("div", {}, [el("i", { class: "bar",
+            style: "width:" + Math.max(2, (Math.abs(x.contribution) / sMax) * 100) + "%;background:"
+              + (x.contribution >= 0 ? "var(--s2)" : "var(--s3)") })]));
+          shap2.appendChild(el("div", { class: "val", text: num(x.contribution, 3) }));
+        });
+        card.appendChild(shap2);
+      }
+      if (c.recommended_action) {
+        card.appendChild(el("p", { class: "action", style: "margin-top:12px", text: c.recommended_action }));
+      }
+      if (c.correction) {
+        card.appendChild(el("p", { class: "sub", style: "margin:10px 0 0",
+          text: "Suggested replacement: " + Object.keys(c.correction).map(k =>
+            k.replace("_c", "").replace("_hpa", "").replace("_pct", "") + " " + c.correction[k]).join(", ")
+            + " (kept beside the raw reading, never over it)" }));
+      }
+      g7.appendChild(card);
+    });
+  }
+
+  /* ================================================================== */
+  /* 8. sensor health                                                    */
+  /* ================================================================== */
+  const s8 = section("8", "Which sensors are going bad",
+    "A spike says one observation is wrong. A sinking health score says the instrument is dying, which is a "
+    + "maintenance ticket rather than a quarantine. A station is only as trustworthy as its worst channel.");
+  const hp = panel(s8);
+  const htable = el("table");
+  htable.appendChild(el("thead", {}, [(() => {
+    const tr = el("tr");
+    ["Station", "Temperature", "Pressure", "Humidity", "Station score", "Status", "Maintenance risk"]
+      .forEach(t => tr.appendChild(el("th", { text: t })));
+    return tr;
+  })()]));
+  const hb = el("tbody");
+  D.health.forEach(row => {
+    const meta = D.stations.find(st => st.station_id === row.station_id) || {};
+    const tr = el("tr");
+    tr.appendChild(el("td", {}, [
+      el("div", { text: meta.name || row.station_id }),
+      el("div", { style: "color:var(--faint);font-size:11.5px",
+        text: Math.round(meta.elevation_m || 0) + " m, " + (meta.terrain || "") })
+    ]));
+    ["temp_c", "pressure_hpa", "rh_pct"].forEach(v => {
+      const sensor = row.sensors[v];
+      const colour = sensor.score >= 85 ? "var(--ok)" : (sensor.score >= 60 ? "var(--warn)" : "var(--bad)");
+      const td = el("td", {}, [
+        el("div", { text: num(sensor.score, 1), style: "color:" + colour + ";font-weight:600" }),
+        el("div", { class: "meter", style: "margin-top:4px" }, [
+          el("i", { style: "width:" + sensor.score + "%;background:" + colour })
+        ])
+      ]);
+      td.title = sensor.status + ": " + sensor.reasons.join("; ");
+      tr.appendChild(td);
+    });
+    tr.appendChild(el("td", { text: num(row.station_score, 1) }));
+    tr.appendChild(el("td", {}, [el("span", {
+      class: "tag " + (row.status === "healthy" ? "ok" : (row.status === "critical" ? "bad" : "warn")),
+      text: row.status })]));
+    tr.appendChild(el("td", { text: row.maintenance_risk }));
+    hb.appendChild(tr);
+  });
+  htable.appendChild(hb);
+  const hsc = el("div", { class: "scroller" });
+  hsc.appendChild(htable);
+  hp.appendChild(hsc);
+  hp.appendChild(el("p", { class: "caveat", text:
+    "Each sensor starts at 100 and loses points for how often it was blamed, whether its reconstruction error "
+    + "is ramping, and whether its residual sits off centre and drifting. Hover a score for the deductions behind it." }));
+
+  /* ================================================================== */
+  /* 9. real time                                                        */
+  /* ================================================================== */
+  const P = D.performance;
+  const s9 = section("9", "Real time on one CPU core",
+    "No GPU, no service dependencies, one library. This is the number that decides whether the system can sit "
+    + "in front of a live network rather than behind it.");
+  const perfCards = el("div", { class: "stats" });
+  [
+    { v: Math.round(P.observations_per_second).toLocaleString(), k: "Observations per second", note: "single core, all six layers", cls: "good" },
+    { v: num(P.detection_median_latency_ms, 2) + " ms", k: "Median detection latency", note: "per observation, explanation excluded" },
+    { v: num(P.detection_p95_latency_ms, 2) + " ms", k: "95th percentile detection latency", note: "the slow tail an operator would notice" },
+    { v: num(P.explained_median_latency_ms, 1) + " ms", k: "Median latency when explaining", note: P.n_explained + " flagged records also ran Shapley attribution" }
+  ].forEach(c => {
+    perfCards.appendChild(el("div", { class: "stat " + (c.cls || "") }, [
+      el("div", { class: "v", text: c.v }),
+      el("div", { class: "k", text: c.k }),
+      el("div", { class: "note", text: c.note })
+    ]));
+  });
+  s9.appendChild(perfCards);
+  const scaleP = panel(s9, "What that means for a network",
+    "At the measured rate, one core keeps up with a network of this size many times over.");
+  const perStation = P.observations_per_second * (M.interval_minutes * 60);
+  scaleP.appendChild(el("p", { class: "sub", style: "margin:0", text:
+    "At " + M.interval_minutes + "-minute sampling, one core can carry roughly "
+    + Math.round(perStation).toLocaleString() + " stations before the arrival rate catches the processing rate. "
+    + "Per-observation state is bounded, so memory does not grow with stream length and stations shard cleanly across cores." }));
+
+  /* ================================================================== */
+  /* 10. what the run does not prove                                     */
+  /* ================================================================== */
+  const s10 = section("10", "What this run does not prove",
+    "The honest limits of the numbers above, so nobody reads more into them than they carry.");
+  const lp = panel(s10);
+  const limits = [];
+  limits.push("<b>The weather is real, the faults are not.</b> Observations come from a reanalysis archive at real "
+    + "station coordinates, which carries real diurnal, seasonal and synoptic structure but no sensor pathology. "
+    + "Faults are injected so that ground truth exists at all. No public AWS archive is labelled per observation.");
+  limits.push("<b>Pressure sits at model terrain height</b>, not at a real barometer's height, so absolute levels can be "
+    + "a few hPa off. Every check here is per-station and relative, so a constant offset is absorbed by calibration.");
+  const drift = (D.operational ? D.operational.per_class_recall.drift : undefined);
+  if (drift !== undefined && drift < 0.5) {
+    limits.push("<b>Drift recall is " + pct(drift) + ", and that is by design.</b> A bias that grows slowly enough is "
+      + "meant to look normal to a windowed autoencoder. It is the sensor-health layer over days that catches it, "
+      + "not per-observation detection.");
+  }
+  const rulesRow = D.ablation.find(r => r.name.indexOf("rules only") >= 0);
+  const fullRow = D.ablation[D.ablation.length - 1];
+  if (rulesRow && fullRow && rulesRow.f1 > fullRow.f1) {
+    limits.push("<b>Rules alone beat the full stack on F1 here (" + num(rulesRow.f1, 3) + " against "
+      + num(fullRow.f1, 3) + ").</b> The stack wins where it matters operationally: real weather flagged as a fault, "
+      + pct(fullRow.genuine_extreme_far) + " against " + pct(rulesRow.genuine_extreme_far)
+      + ", and ranking quality, " + num(fullRow.roc_auc, 3) + " against " + num(rulesRow.roc_auc, 3)
+      + ". Every extra layer that abstains also pulls the fused mean down, which costs recall.");
+  }
+  limits.push("<b>One seed, one split, one network.</b> Seeds are printed so the run reproduces exactly, but a single "
+    + "run is not a confidence interval. Vary <code>--seed</code> to see the spread.");
+  limits.push("<b>Spatial QC needs neighbours.</b> Layer 4 abstains below two comparable stations, so a sparse network "
+    + "loses the strongest fault-versus-weather discriminator the system has.");
+  const ul = el("ul", { class: "plain" });
+  limits.forEach(t => ul.appendChild(el("li", { html: t })));
+  lp.appendChild(ul);
+
+  const foot = el("p", { class: "caveat", style: "margin-top:28px" });
+  foot.innerHTML = "Regenerate everything on this page with <code>python -m skyguard.eval.report</code>. "
+    + "The live operations console is <a href='index.html'>index.html</a>.";
+  root.appendChild(foot);
+})();
+</script>
+</body>
+</html>

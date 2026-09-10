@@ -1,10 +1,10 @@
 # SkyGuard AI — use cases and operator runbook
 
-How to perform every job on this system: run it, feed it, read it, act on it, and demo it to judges. Numbers below are the verified `examples/quickstart.py` output — rerun it if you doubt any of them.
+How to perform every job on this system: run it, feed it, read it, act on it, and demo it to judges. Numbers below are the verified `python -m skyguard.eval.report` output — rerun it if you doubt any of them.
 
 ## 1. Perform: the runbook
 
-**A. Prove it works (2 min).** `pip install numpy`, then `python tests/run_tests.py` (120 green) and `python examples/quickstart.py` (expect: hybrid precision 0.91, event recall 0.87, genuine-weather FAR 0.02; zscore FAR 0.45 as the contrast).
+**A. Prove it works (2 min).** `pip install numpy`, then `python tests/run_tests.py` (120 green) and `python -m skyguard.eval.report` (expect: hybrid precision 0.91, event recall 0.87, genuine-weather FAR 0.02; zscore FAR 0.45 as the contrast).
 
 **B. Feed your own CSV.** `load_csv(path, station_id=...)` auto-detects timestamp/station/T/P/RH columns (Fahrenheit, sea-level pressure and dew-point archives are converted; pass `column_map` for awkward headers). Stream each `Observation` through `SkyGuardPipeline.process()` — one call returns the full `QCRecord`.
 
@@ -31,7 +31,7 @@ How to perform every job on this system: run it, feed it, read it, act on it, an
 
 ## 3. Use cases
 
-1. **The SIH example.** 55 °C + 96 % RH + odd pressure while neighbours read normal → `SUSPICIOUS p=0.74`, quarantined, correction estimated, wiring inspection recommended. (Reproduced live by the quickstart's final step.)
+1. **The SIH example.** 55 °C + 96 % RH + odd pressure while neighbours read normal → `ESTIMATED, SUSPICIOUS p=0.76`, quarantined with a correction estimated and all three sensors flagged for cross-check. `python serve.py` replays it as its final step.
 2. **Heatwave vs broken heater.** All stations rise together → spatial agrees, guard damps, no alarm. One station spikes → convicted. Demo measured genuine-weather FAR 0.02 vs 0.42 for threshold logic.
 3. **Monsoon onset.** Step-like cooling + soaking across the network with coherent covariates → trusted as weather; the injector is explicitly barred from scoring regime faults inside such spans.
 4. **Stuck humidity probe.** RH flatlines for days → persistence + health trend fire; fog plateaus are exempted by the saturation rule, so this alarm means something.
@@ -42,7 +42,7 @@ How to perform every job on this system: run it, feed it, read it, act on it, an
 
 ## 4. The 5-minute judges' demo (maps to the weights)
 
-1. **(0:00) Problem + headline replay** — run the quickstart's SIH example live; show quarantine + explanation (Innovation, Deployability).
+1. **(0:00) Problem + headline replay** — `python serve.py` replays the SIH example on the real network; show quarantine + explanation (Innovation, Deployability).
 2. **(1:00) Heatwave honesty** — shared heatwave stays quiet while a lone spike fires; quote genuine FAR 0.02 vs 0.42 (Accuracy, Explainability).
 3. **(2:00) Streaming proof** — `process()` one observation, show `latency_ms`; bounded state, O(1)/point, numpy-only CPU (Real-time, Scalability, Energy).
 4. **(3:00) Diagnosis + action** — open a verdict: fault class, confidence, evidence lines, recommended action, correction with confidence (Explainability).

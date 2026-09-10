@@ -9,6 +9,10 @@ module before the test modules import it.
 The tests are written as ordinary pytest tests, so `pytest tests/` works too
 wherever pytest IS available. This script is the fallback, not a replacement.
 
+When real pytest IS installed the shim steps aside, and then the parametrize
+cases live in pytest's own `pytestmark` attribute instead of ours. Collection
+reads both, so `python tests/run_tests.py` expands the same cases either way.
+
 Usage:
     python tests/run_tests.py            # run everything
     python tests/run_tests.py rules      # only modules matching "rules"
@@ -27,6 +31,10 @@ from typing import Any, Callable, Dict, List, Tuple
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+# Shared fixtures live in tests/support.py. pytest puts a test file's own
+# directory on the path for non-package test dirs; this runner loads modules by
+# path, so it has to do the same or `import support` fails only here.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 # --------------------------------------------------------------------------
@@ -112,6 +120,64 @@ def _fail(reason: str = "") -> None:
     raise AssertionError(reason)
 
 
+def _build_cases(names: List[str], argvalues: List[Any],
+                 owner: str) -> List[Tuple[Dict[str, Any], str]]:
+    """Turn one parametrize mark into (kwargs, label) cases."""
+    cases: List[Tuple[Dict[str, Any], str]] = []
+    for values in argvalues:
+        if len(names) == 1:
+            bound = {names[0]: values}
+            label = repr(values)
+        else:
+            seq = values if isinstance(values, (list, tuple)) else (values,)
+            if len(seq) != len(names):
+                raise ValueError(
+                    f"parametrize arity mismatch for {owner}: {names} vs {seq!r}"
+                )
+            bound = dict(zip(names, seq))
+            label = "-".join(repr(v) for v in seq)
+        cases.append((bound, label))
+    return cases
+
+
+def _split_names(argnames: Any) -> List[str]:
+    if isinstance(argnames, str):
+        return [n.strip() for n in argnames.split(",") if n.strip()]
+    return list(argnames)
+
+
+def parameter_cases(func: Callable) -> List[Tuple[Dict[str, Any], str]]:
+    """Every case this test runs, from whichever parametrize left its marks.
+
+    The shim records cases on `_param_cases`. Real pytest records Mark objects
+    on `pytestmark` and expands them at collection time, which this runner does
+    not go through, so a parametrized test would otherwise be called with no
+    arguments and fail on a machine that happens to have pytest installed.
+    """
+    recorded = getattr(func, "_param_cases", None)
+    if recorded:
+        return recorded
+
+    marks = [m for m in getattr(func, "pytestmark", []) if getattr(m, "name", "") == "parametrize"]
+    if not marks:
+        return [({}, "")]
+
+    cases: List[Tuple[Dict[str, Any], str]] = [({}, "")]
+    # Stacked decorators apply bottom-up, and pytest lists them in that order;
+    # the cross product below matches the shim's own stacking behaviour.
+    for mark in marks:
+        names = _split_names(mark.args[0])
+        fresh = _build_cases(names, list(mark.args[1]), func.__name__)
+        combined: List[Tuple[Dict[str, Any], str]] = []
+        for outer, olabel in fresh:
+            for inner, ilabel in cases:
+                merged = dict(inner)
+                merged.update(outer)
+                combined.append((merged, "-".join(p for p in (olabel, ilabel) if p)))
+        cases = combined
+    return cases
+
+
 class _Mark:
     """Implements @pytest.mark.parametrize and tolerates other marks."""
 
@@ -123,21 +189,7 @@ class _Mark:
             names = list(argnames)
 
         def decorator(func: Callable) -> Callable:
-            cases: List[Tuple[Dict[str, Any], str]] = []
-            for values in argvalues:
-                if len(names) == 1:
-                    bound = {names[0]: values}
-                    label = repr(values)
-                else:
-                    seq = values if isinstance(values, (list, tuple)) else (values,)
-                    if len(seq) != len(names):
-                        raise ValueError(
-                            f"parametrize arity mismatch for {func.__name__}: "
-                            f"{names} vs {seq!r}"
-                        )
-                    bound = dict(zip(names, seq))
-                    label = "-".join(repr(v) for v in seq)
-                cases.append((bound, label))
+            cases = _build_cases(names, argvalues, func.__name__)
 
             existing = getattr(func, "_param_cases", None)
             if existing:
@@ -241,7 +293,7 @@ def main(argv: List[str]) -> int:
         print(f"\n{path.stem}  ({len(tests)} test functions)")
 
         for name, func in tests:
-            cases = getattr(func, "_param_cases", [({}, "")])
+            cases = parameter_cases(func)
             for kwargs, label in cases:
                 display = f"{name}[{label}]" if label else name
                 try:

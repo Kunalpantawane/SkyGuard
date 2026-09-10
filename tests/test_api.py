@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-from skyguard.api.server import LiveServer
+from skyguard.api.server import LiveServer, _load_dotenv
 from skyguard.pipeline import SkyGuardPipeline
 from skyguard.store import AuditStore
 from skyguard.types import Station
@@ -98,3 +98,25 @@ def test_bad_payloads_are_400s():
         server.stop()
         store.close()
         tmp.cleanup()
+
+
+def test_dotenv_fills_gap_but_env_wins():
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmp:
+        dotenv = Path(tmp) / '.env'
+        dotenv.write_text('SKYGUARD_API_TOKEN=file-token\n# comment\nEMPTY=\n', encoding='utf-8')
+        os.environ.pop('SKYGUARD_API_TOKEN', None)
+        try:
+            _load_dotenv(dotenv)
+            assert os.environ['SKYGUARD_API_TOKEN'] == 'file-token'
+            os.environ['SKYGUARD_API_TOKEN'] = 'env-token'
+            _load_dotenv(dotenv)
+            assert os.environ['SKYGUARD_API_TOKEN'] == 'env-token'
+        finally:
+            os.environ.pop('SKYGUARD_API_TOKEN', None)
+
+
+def test_dotenv_missing_file_is_silent():
+    from pathlib import Path
+    _load_dotenv(Path(tempfile.gettempdir()) / 'sg-no-such-env')
+

@@ -10,9 +10,9 @@ import numpy as np
 import pytest
 
 from skyguard.baselines.zscore import RobustZScore
-from skyguard.config import InjectorConfig, SimulatorConfig
+from skyguard.config import InjectorConfig
 from skyguard.data.injector import inject_faults
-from skyguard.data.simulator import simulate_network
+from support import archive_available, real_network
 from skyguard.eval.harness import RulesBaseline, compare, format_table
 from skyguard.eval.metrics import (
     confusion_matrix,
@@ -84,8 +84,8 @@ def test_confusion_and_calibration():
 # --------------------------------------------------------------------------
 
 def injected_slice():
-    """Small seeded network, faults confined to the test split."""
-    net = simulate_network(SimulatorConfig(n_stations=2, days=40, seed=7))
+    """A slice of the real archive, faults confined to the test split."""
+    net = real_network(days=40, n_stations=2)
     train, _, test = (slice(0, 576), slice(576, 768), slice(768, 960))
     result = inject_faults(net, InjectorConfig(seed=11), index_range=(test.start, test.stop - 1))
     faulted = result.network
@@ -98,6 +98,8 @@ def injected_slice():
 
 
 def test_harness_compares_detectors_on_injected_data():
+    if not archive_available():
+        pytest.skip("run examples/fetch_real_data.py to download the archive CSV")
     levels, train_levels, truth, classes, stamps = injected_slice()
     assert truth.sum() > 0  # the slice must contain real faults to be a test
     detectors = {

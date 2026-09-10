@@ -271,32 +271,8 @@ class CorrectionConfig:
 
 
 # --------------------------------------------------------------------------
-# Simulation
+# Fault injection
 # --------------------------------------------------------------------------
-
-@dataclass(frozen=True)
-class SimulatorConfig:
-    """Synthetic AWS network generation."""
-
-    n_stations: int = 12
-    interval_minutes: int = 60
-    days: int = 240
-    seed: int = 42
-
-    # Measurement noise (per-observation, independent).
-    noise_temp_c: float = 0.25
-    noise_pressure_hpa: float = 0.20
-    noise_rh_pct: float = 1.5
-
-    # Synoptic system behaviour: shared, spatially coherent random walk.
-    synoptic_pressure_amplitude: float = 9.0
-    synoptic_correlation_km: float = 400.0
-    synoptic_timescale_hours: float = 60.0
-
-    # Genuine extreme weather, injected as *normal* labelled negative controls.
-    n_heatwaves: int = 3
-    n_pressure_surges: int = 3
-    n_monsoon_onsets: int = 2
 
 
 @dataclass(frozen=True)
@@ -394,7 +370,6 @@ class Config:
     events: EventConfig = field(default_factory=EventConfig)
     health: HealthConfig = field(default_factory=HealthConfig)
     correction: CorrectionConfig = field(default_factory=CorrectionConfig)
-    simulator: SimulatorConfig = field(default_factory=SimulatorConfig)
     injector: InjectorConfig = field(default_factory=InjectorConfig)
     forest: ForestConfig = field(default_factory=ForestConfig)
     shapley: ShapleyConfig = field(default_factory=ShapleyConfig)
